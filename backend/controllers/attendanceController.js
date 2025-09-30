@@ -1,0 +1,234 @@
+const pool = require('../db');
+
+// Get attendance records (with branch filtering for instructors)
+const getAttendance = async (req, res) => {
+    try {
+        const { student_id, start_date, end_date, branch_id } = req.query;
+
+        let query = `
+      SELECT a.*, s.first_name, s.last_name, s.belt_level, b.name as branch_name
+      FROM attendance a
+      JOIN students s ON a.student_id = s.id
+      JOIN branches b ON s.branch_id = b.id
+      WHERE s.is_active = true
+    `;
+        let params = [];
+        let paramCount = 0;
+
+        // Filter by branch for instructors
+        if (req.user.role === 'instructor') {
+            query += ` AND s.branch_id = $${++paramCount}`;
+            params.push(req.user.branch_id);
+        }
+
+        // Filter by specific student
+        if (student_id) {
+            query += ` AND a.student_id = $${++paramCount}`;
+            params.push(student_id);
+        }
+
+        // Filter by date range
+        if (start_date) {
+            query += ` AND a.class_date >= $${++paramCount}`;
+            params.push(start_date);
+        }
+
+        if (end_date) {
+            query += ` AND a.class_date <= $${++paramCount}`;
+            params.push(end_date);
+        }
+
+        // Filter by branch (admin only)
+        if (req.user.role === 'admin' && branch_id) {
+            query += ` AND s.branch_id = $${++paramCount}`;
+            params.push(branch_id);
+        }
+
+        query += ` ORDER BY a.class_date DESC, s.last_name, s.first_name`;
+
+        const result = await pool.query(query, params);
+        res.json({ attendance: result.rows });
+    } catch (error) {
+        console.error('Get attendance error:', error);
+        res.status(500).json({ error: 'Failed to fetch attendance' });
+    }
+};
+
+// Get attendance by ID
+const getAttendanceById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        let query = `
+      SELECT a.*, s.first_name, s.last_name, s.belt_level, b.name as branch_name
+      FROM attendance a
+      JOIN students s ON a.student_id = s.id
+      JOIN branches b ON s.branch_id = b.id
+      WHERE a.id = $1
+    `;
+        let params = [id];
+
+        // Filter by branch for instructors
+        if (req.user.role === 'instructor') {
+            query += ` AND s.branch_id = $2`;
+            params.push(req.user.branch_id);
+        }
+
+        const result = await pool.query(query, params);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Attendance record not found' });
+        }
+
+        res.json({ attendance: result.rows[0] });
+    } catch (error) {
+        console.error('Get attendance error:', error);
+        res.status(500).json({ error: 'Failed to fetch attendance record' });
+    }
+};
+
+// Create attendance record
+const createAttendance = async (req, res) => {
+    try {
+        const { student_id, class_date, status, notes } = req.body;
+
+        // Validate required fields
+        if (!student_id || !class_date || !status) {
+            return res.status(400).json({ error: 'Student ID, class date, and status are required' });
+        }
+
+        // Validate status
+        if (!['present', 'absent', 'late'].includes(status)) {
+            return res.status(400).json({ error: 'Status must be present, absent, or late' });
+        }
+
+        // Check if student exists and user has access
+        let studentQuery = 'SELECT * FROM students WHERE id = $1';
+        let studentParams = [student_id];
+
+        if (req.user.role === 'instructor') {
+            studentQuery += ' AND branch_id = $2';
+            studentParams.push(req.user.branch_id);
+        }
+
+        const studentResult = await pool.query(studentQuery, studentParams);
+        if (studentResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Student not found or access denied' });
+        }
+
+        // Check if attendance record already exists for this student and date
+        const existingRecord = await pool.query(
+            'SELECT * FROM attendance WHERE student_id = $1 AND class_date = $2',
+            [student_id, class_date]
+        );
+
+        if (existingRecord.rows.length > 0) {
+            return res.status(400).json({ error: 'Attendance record already exists for this date' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO attendance (student_id, class_date, status, notes, marked_by) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING *`,
+            [student_id, class_date, status, notes, req.user.id]
+        );
+
+        res.status(201).json({
+            message: 'Attendance recorded successfully',
+            attendance: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Create attendance error:', error);
+        res.status(500).json({ error: 'Failed to record attendance' });
+    }
+};
+
+// Update attendance record
+const updateAttendance = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, notes } = req.body;
+
+        // Check if attendance record exists and user has access
+        let checkQuery = `
+      SELECT a.*, s.branch_id 
+      FROM attendance a 
+      JOIN students s ON a.student_id = s.id 
+      WHERE a.id = $1
+    `;
+        let checkParams = [id];
+
+        if (req.user.role === 'instructor') {
+            checkQuery += ` AND s.branch_id = $2`;
+            checkParams.push(req.user.branch_id);
+        }
+
+        const checkResult = await pool.query(checkQuery, checkParams);
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Attendance record not found or access denied' });
+        }
+
+        // Validate status
+        if (status && !['present', 'absent', 'late'].includes(status)) {
+            return res.status(400).json({ error: 'Status must be present, absent, or late' });
+        }
+
+        const result = await pool.query(
+            `UPDATE attendance SET 
+        status = COALESCE($1, status),
+        notes = COALESCE($2, notes)
+      WHERE id = $3 
+      RETURNING *`,
+            [status, notes, id]
+        );
+
+        res.json({
+            message: 'Attendance updated successfully',
+            attendance: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Update attendance error:', error);
+        res.status(500).json({ error: 'Failed to update attendance' });
+    }
+};
+
+// Delete attendance record
+const deleteAttendance = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Check if attendance record exists and user has access
+        let checkQuery = `
+      SELECT a.*, s.branch_id 
+      FROM attendance a 
+      JOIN students s ON a.student_id = s.id 
+      WHERE a.id = $1
+    `;
+        let checkParams = [id];
+
+        if (req.user.role === 'instructor') {
+            checkQuery += ` AND s.branch_id = $2`;
+            checkParams.push(req.user.branch_id);
+        }
+
+        const checkResult = await pool.query(checkQuery, checkParams);
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Attendance record not found or access denied' });
+        }
+
+        await pool.query('DELETE FROM attendance WHERE id = $1', [id]);
+
+        res.json({ message: 'Attendance record deleted successfully' });
+    } catch (error) {
+        console.error('Delete attendance error:', error);
+        res.status(500).json({ error: 'Failed to delete attendance record' });
+    }
+};
+
+module.exports = {
+    getAttendance,
+    getAttendanceById,
+    createAttendance,
+    updateAttendance,
+    deleteAttendance
+};

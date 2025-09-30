@@ -1,0 +1,26 @@
+{
+    "instructorRanks": [
+        "blue",
+        "red stripe",
+        "red",
+        "black stripe",
+        "Dan 1",
+        "Dan 2",
+        "Dan 3"
+    ],
+    "studentRanks": [
+        "white",
+        "yellow stripe",
+        "yellow",
+        "green stripe",
+        "green",
+        "blue stripe",
+        "blue",
+        "red stripe",
+        "red",
+        "black stripe",
+        "Dan 1",
+        "Dan 2",
+        "Dan 3"
+    ]
+}
