@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://gama-backend.onrender.com/api' : 'http://localhost:5000/api');
+// Force production URL for deployed frontend
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://gama-backend.onrender.com/api';
 
 class ApiClient {
     constructor() {
@@ -15,6 +16,7 @@ class ApiClient {
 
     async request(endpoint, options = {}) {
         const url = `${this.baseURL}${endpoint}`;
+        console.log('API Request:', url); // Debug log
         const config = {
             headers: this.getAuthHeaders(),
             ...options
