@@ -36,6 +36,28 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Root endpoint
+app.get('/', (req, res) => {
+    res.json({
+        message: 'GAMA Martial Arts Management System API',
+        version: '1.0.0',
+        status: 'running',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        endpoints: {
+            health: '/health',
+            auth: '/api/auth',
+            branches: '/api/branches',
+            students: '/api/students',
+            instructors: '/api/instructors',
+            attendance: '/api/attendance',
+            fees: '/api/fees',
+            dashboard: '/api/dashboard',
+            inventory: '/api/inventory'
+        }
+    });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({
