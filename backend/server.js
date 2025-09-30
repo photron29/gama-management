@@ -32,6 +32,9 @@ app.use(cors({
         'https://gama-management.vercel.app',
         'https://gama-management-git-main.vercel.app',
         'https://gama-management-git-develop.vercel.app',
+        'https://ganeshaacademy.vercel.app',
+        'https://ganeshaacademy-git-main.vercel.app',
+        'https://ganeshaacademy-git-develop.vercel.app',
         process.env.FRONTEND_URL
     ].filter(Boolean),
     credentials: true,
@@ -65,6 +68,15 @@ app.get('/', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
+
+// API health check endpoint
+app.get('/api/health', (req, res) => {
     res.json({
         status: 'OK',
         timestamp: new Date().toISOString(),
