@@ -29,9 +29,14 @@ app.use(cors({
         'http://192.168.1.242:5173',
         'http://192.168.1.242:3000',
         'http://192.168.1.242:8080',
+        'https://gama-management.vercel.app',
+        'https://gama-management-git-main.vercel.app',
+        'https://gama-management-git-develop.vercel.app',
         process.env.FRONTEND_URL
     ].filter(Boolean),
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
