@@ -41,39 +41,39 @@ class ApiClient {
 
     // Auth endpoints
     async login(credentials) {
-        return this.request('/api/auth/login', {
+        return this.request('/auth/login', {
             method: 'POST',
             body: JSON.stringify(credentials)
         });
     }
 
     async getProfile() {
-        return this.request('/api/auth/profile');
+        return this.request('/auth/profile');
     }
 
     async logout() {
-        return this.request('/api/auth/logout', { method: 'POST' });
+        return this.request('/auth/logout', { method: 'POST' });
     }
 
     // Students endpoints
     async getStudents(params = {}) {
         const queryString = new URLSearchParams(params).toString();
-        return this.request(`/api/students${queryString ? `?${queryString}` : ''}`);
+        return this.request(`/students${queryString ? `?${queryString}` : ''}`);
     }
 
     async getStudent(id) {
-        return this.request(`/api/students/${id}`);
+        return this.request(`/students/${id}`);
     }
 
     async createStudent(studentData) {
-        return this.request('/api/students', {
+        return this.request('/students', {
             method: 'POST',
             body: JSON.stringify(studentData)
         });
     }
 
     async updateStudent(id, studentData) {
-        return this.request(`/api/students/${id}`, {
+        return this.request(`/students/${id}`, {
             method: 'PUT',
             body: JSON.stringify(studentData)
         });
@@ -81,36 +81,36 @@ class ApiClient {
 
     async deleteStudent(id, permanent = false) {
         const queryString = permanent ? '?permanent=true' : '';
-        return this.request(`/api/students/${id}${queryString}`, { method: 'DELETE' });
+        return this.request(`/students/${id}${queryString}`, { method: 'DELETE' });
     }
 
     async getInactiveStudents() {
-        return this.request('/api/students/inactive');
+        return this.request('/students/inactive');
     }
 
     async restoreStudent(id) {
-        return this.request(`/api/students/${id}/restore`, { method: 'POST' });
+        return this.request(`/students/${id}/restore`, { method: 'POST' });
     }
 
     // Instructors endpoints
     async getInstructors(params = {}) {
         const queryString = new URLSearchParams(params).toString();
-        return this.request(`/api/instructors${queryString ? `?${queryString}` : ''}`);
+        return this.request(`/instructors${queryString ? `?${queryString}` : ''}`);
     }
 
     async getInstructor(id) {
-        return this.request(`/api/instructors/${id}`);
+        return this.request(`/instructors/${id}`);
     }
 
     async createInstructor(instructorData) {
-        return this.request('/api/instructors', {
+        return this.request('/instructors', {
             method: 'POST',
             body: JSON.stringify(instructorData)
         });
     }
 
     async updateInstructor(id, instructorData) {
-        return this.request(`/api/instructors/${id}`, {
+        return this.request(`/instructors/${id}`, {
             method: 'PUT',
             body: JSON.stringify(instructorData)
         });
