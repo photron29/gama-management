@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
+const config = require('../config');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+const JWT_SECRET = config.jwt.secret || 'your-secret-key-change-in-production';
+const SUPABASE_JWT_SECRET = config.supabase.jwtSecret;
 
 // Generate JWT token
 const generateToken = (user) => {

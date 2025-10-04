@@ -1,12 +1,8 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+const config = require('./config');
 
 const pool = new Pool({
-    user: process.env.DB_USER || 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
+    ...config.database,
     // Set client timezone to Asia/Kolkata to match database
     options: '-c timezone=Asia/Kolkata'
 });

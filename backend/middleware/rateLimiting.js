@@ -1,10 +1,11 @@
 // Rate limiting middleware
 const rateLimit = require('express-rate-limit');
+const config = require('../config');
 
 // General rate limiter
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === 'production' ? 1000 : 5000, // More lenient in development
+    max: config.server.nodeEnv === 'production' ? 1000 : 5000, // More lenient in development
     message: {
         error: 'Too many requests from this IP, please try again later.',
         retryAfter: '15 minutes'
@@ -29,7 +30,7 @@ const authLimiter = rateLimit({
 // API rate limiter
 const apiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: process.env.NODE_ENV === 'production' ? 300 : 1000, // More lenient in development
+    max: config.server.nodeEnv === 'production' ? 300 : 1000, // More lenient in development
     message: {
         error: 'API rate limit exceeded, please slow down.',
         retryAfter: '1 minute'
@@ -65,7 +66,7 @@ const attendanceLimiter = rateLimit({
 // Lenient rate limiter for data fetching (dashboard, students, etc.)
 const dataFetchLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: process.env.NODE_ENV === 'production' ? 100 : 1000, // More lenient in development
+    max: config.server.nodeEnv === 'production' ? 100 : 1000, // More lenient in development
     message: {
         error: 'Too many data requests, please slow down.',
         retryAfter: '1 minute'

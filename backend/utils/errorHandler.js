@@ -1,3 +1,5 @@
+const config = require('../config');
+
 // Global error handling middleware
 const errorHandler = (err, req, res, next) => {
     console.error('Error:', err);
@@ -52,7 +54,7 @@ const errorHandler = (err, req, res, next) => {
 
     res.status(error.status).json({
         error: error.message,
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+        ...(config.server.nodeEnv === 'development' && { stack: err.stack })
     });
 };
 
