@@ -23,6 +23,7 @@ const { errorHandler, notFound } = require('./utils/errorHandler');
 
 
 // Middleware
+app.set('trust proxy', 1); // Trust first proxy
 app.use(cors({
     origin: [
         'http://localhost:5173',
@@ -258,7 +259,7 @@ app.get('/api/check-data', async (req, res) => {
     }
 });
 
-// API routes (rate limiting removed)
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/branches', branchesRoutes);
 app.use('/api/students', studentsRoutes);
