@@ -21,8 +21,7 @@ const inventoryRoutes = require('./routes/inventory');
 // Import error handlers
 const { errorHandler, notFound } = require('./utils/errorHandler');
 
-// Import middleware
-const { generalLimiter, authLimiter, apiLimiter, dataFetchLimiter } = require('./middleware/rateLimiting');
+// Import middleware (rate limiting removed)
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -49,10 +48,6 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Apply rate limiting
-app.use(generalLimiter);
-app.use('/api', apiLimiter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -267,18 +262,18 @@ app.get('/api/check-data', async (req, res) => {
     }
 });
 
-// API routes with rate limiting
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/branches', dataFetchLimiter, branchesRoutes);
-app.use('/api/students', dataFetchLimiter, studentsRoutes);
-app.use('/api/instructors', dataFetchLimiter, instructorsRoutes);
+// API routes (rate limiting removed)
+app.use('/api/auth', authRoutes);
+app.use('/api/branches', branchesRoutes);
+app.use('/api/students', studentsRoutes);
+app.use('/api/instructors', instructorsRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/attendance/approval', attendanceApprovalsRoutes);
-app.use('/api/products', dataFetchLimiter, productsRoutes);
-app.use('/api/orders', dataFetchLimiter, ordersRoutes);
-app.use('/api/fees', dataFetchLimiter, feesRoutes);
-app.use('/api/dashboard', dataFetchLimiter, dashboardRoutes);
-app.use('/api/inventory', dataFetchLimiter, inventoryRoutes);
+app.use('/api/products', productsRoutes);
+app.use('/api/orders', ordersRoutes);
+app.use('/api/fees', feesRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // 404 handler
 app.use(notFound);
