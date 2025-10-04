@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../utils/api';
+import LoadingAtom from '../components/LoadingAtom';
 import {
     FaUsers,
     FaUserTie,
@@ -8,13 +9,15 @@ import {
     FaRupeeSign,
     FaChartLine,
     FaCalendarAlt,
-    FaMoneyBillWave
+    FaMoneyBillWave,
+    FaSyncAlt
 } from 'react-icons/fa';
 
 const Dashboard = () => {
     const { user } = useAuth();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [showAllAttendance, setShowAllAttendance] = useState(false);
     const [showAllFees, setShowAllFees] = useState(false);
 
@@ -22,21 +25,31 @@ const Dashboard = () => {
         fetchDashboardStats();
     }, []);
 
-    const fetchDashboardStats = async () => {
+    const fetchDashboardStats = async (isRefresh = false) => {
         try {
+            if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
             const data = await apiClient.getDashboardStats();
             setStats(data);
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const handleRefresh = () => {
+        fetchDashboardStats(true);
     };
 
     if (loading) {
         return (
             <div className="dashboard-loading">
-                <div className="loading-spinner"></div>
+                <LoadingAtom size="medium" />
                 <p>Loading dashboard...</p>
             </div>
         );
@@ -98,77 +111,79 @@ const Dashboard = () => {
                 />
             </div>
 
-            <div className="dashboard-content">
-                <div className="dashboard-section">
-                    <h2>Recent Attendance</h2>
-                    <div className="recent-list">
-                        {stats?.recent_attendance?.length > 0 ? (
-                            <>
-                                {(showAllAttendance ? stats.recent_attendance : stats.recent_attendance.slice(0, 5)).map((record) => (
-                                    <div key={record.id} className="recent-item">
-                                        <div className="recent-info">
-                                            <span className="student-name">
-                                                {record.first_name} {record.last_name}
-                                            </span>
-                                            <span className="branch-name">{record.branch_name}</span>
+            {user?.role === 'admin' && (
+                <div className="dashboard-content">
+                    <div className="dashboard-section">
+                        <h2>Recent Attendance</h2>
+                        <div className="recent-list">
+                            {stats?.recent_attendance?.length > 0 ? (
+                                <>
+                                    {(showAllAttendance ? stats.recent_attendance : stats.recent_attendance.slice(0, 5)).map((record) => (
+                                        <div key={record.id} className="recent-item">
+                                            <div className="recent-info">
+                                                <span className="student-name">
+                                                    {record.first_name} {record.last_name}
+                                                </span>
+                                                <span className="branch-name">{record.branch_name}</span>
+                                            </div>
+                                            <div className={`status-badge ${record.status}`}>
+                                                {record.status}
+                                            </div>
+                                            <div className="recent-date">
+                                                {new Date(record.class_date).toLocaleDateString()}
+                                            </div>
                                         </div>
-                                        <div className={`status-badge ${record.status}`}>
-                                            {record.status}
-                                        </div>
-                                        <div className="recent-date">
-                                            {new Date(record.class_date).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                ))}
-                                {stats.recent_attendance.length > 5 && (
-                                    <button
-                                        className="btn btn-secondary show-more-btn"
-                                        onClick={() => setShowAllAttendance(!showAllAttendance)}
-                                    >
-                                        {showAllAttendance ? 'Show Less' : `Show More (${stats.recent_attendance.length - 5} more)`}
-                                    </button>
-                                )}
-                            </>
-                        ) : (
-                            <p className="no-data">No recent attendance records</p>
-                        )}
+                                    ))}
+                                    {stats.recent_attendance.length > 5 && (
+                                        <button
+                                            className="btn btn-secondary show-more-btn"
+                                            onClick={() => setShowAllAttendance(!showAllAttendance)}
+                                        >
+                                            {showAllAttendance ? 'Show Less' : `Show More (${stats.recent_attendance.length - 5} more)`}
+                                        </button>
+                                    )}
+                                </>
+                            ) : (
+                                <p className="no-data">No recent attendance records</p>
+                            )}
+                        </div>
                     </div>
-                </div>
 
-                <div className="dashboard-section">
-                    <h2>Recent Fees</h2>
-                    <div className="recent-list">
-                        {stats?.recent_fees?.length > 0 ? (
-                            <>
-                                {(showAllFees ? stats.recent_fees : stats.recent_fees.slice(0, 5)).map((fee) => (
-                                    <div key={fee.id} className="recent-item">
-                                        <div className="recent-info">
-                                            <span className="student-name">
-                                                {fee.first_name} {fee.last_name}
-                                            </span>
-                                            <span className="fee-type">{fee.fee_type}</span>
+                    <div className="dashboard-section">
+                        <h2>Recent Fees</h2>
+                        <div className="recent-list">
+                            {stats?.recent_fees?.length > 0 ? (
+                                <>
+                                    {(showAllFees ? stats.recent_fees : stats.recent_fees.slice(0, 5)).map((fee) => (
+                                        <div key={fee.id} className="recent-item">
+                                            <div className="recent-info">
+                                                <span className="student-name">
+                                                    {fee.first_name} {fee.last_name}
+                                                </span>
+                                                <span className="fee-type">{fee.fee_type}</span>
+                                            </div>
+                                            <div className="fee-amount">₹{fee.amount}</div>
+                                            <div className={`status-badge ${fee.status}`}>
+                                                {fee.status}
+                                            </div>
                                         </div>
-                                        <div className="fee-amount">₹{fee.amount}</div>
-                                        <div className={`status-badge ${fee.status}`}>
-                                            {fee.status}
-                                        </div>
-                                    </div>
-                                ))}
-                                {stats.recent_fees.length > 5 && (
-                                    <button
-                                        className="btn btn-secondary show-more-btn"
-                                        onClick={() => setShowAllFees(!showAllFees)}
-                                    >
-                                        {showAllFees ? 'Show Less' : `Show More (${stats.recent_fees.length - 5} more)`}
-                                    </button>
-                                )}
-                            </>
-                        ) : (
-                            <p className="no-data">No recent fee records</p>
-                        )}
+                                    ))}
+                                    {stats.recent_fees.length > 5 && (
+                                        <button
+                                            className="btn btn-secondary show-more-btn"
+                                            onClick={() => setShowAllFees(!showAllFees)}
+                                        >
+                                            {showAllFees ? 'Show Less' : `Show More (${stats.recent_fees.length - 5} more)`}
+                                        </button>
+                                    )}
+                                </>
+                            ) : (
+                                <p className="no-data">No recent fee records</p>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

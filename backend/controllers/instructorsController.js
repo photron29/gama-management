@@ -1,4 +1,5 @@
 const pool = require('../db');
+const bcrypt = require('bcryptjs');
 
 // Get all instructors (admin only)
 const getInstructors = async (req, res) => {
@@ -76,47 +77,80 @@ const getInstructorById = async (req, res) => {
 
 // Create new instructor (admin only)
 const createInstructor = async (req, res) => {
+    const client = await pool.connect();
     try {
         if (req.user.role !== 'admin') {
             return res.status(403).json({ error: 'Access denied: Admin role required' });
         }
 
         const {
-            user_id,
+            username,
+            password,
             first_name,
             last_name,
             email,
             phone,
             belt_level,
-            branch_id,
             specialization,
             certification_date
         } = req.body;
 
         // Validate required fields
-        if (!first_name || !last_name || !branch_id) {
-            return res.status(400).json({ error: 'First name, last name, and branch are required' });
+        if (!first_name || !last_name || !username || !password) {
+            return res.status(400).json({ error: 'First name, last name, username, and password are required' });
         }
 
-        const result = await pool.query(
+        await client.query('BEGIN');
+
+        // Check if username already exists
+        const existingUser = await client.query(
+            'SELECT id FROM users WHERE username = $1',
+            [username]
+        );
+
+        if (existingUser.rows.length > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+
+        // Hash the password
+        const password_hash = await bcrypt.hash(password, 10);
+
+        // Create user account (no branch assignment initially)
+        const userResult = await client.query(
+            `INSERT INTO users (username, email, password_hash, role, first_name, last_name, phone, belt_level)
+             VALUES ($1, $2, $3, 'instructor', $4, $5, $6, $7)
+             RETURNING id`,
+            [username, email, password_hash, first_name, last_name, phone, belt_level]
+        );
+
+        const user_id = userResult.rows[0].id;
+
+        // Create instructor record (no branch assignment initially)
+        const instructorResult = await client.query(
             `INSERT INTO instructors (
         user_id, first_name, last_name, email, phone, belt_level, 
-        branch_id, specialization, certification_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+        specialization, certification_date, is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true) 
       RETURNING *`,
             [
                 user_id, first_name, last_name, email, phone, belt_level,
-                branch_id, specialization, certification_date
+                specialization, certification_date
             ]
         );
 
+        await client.query('COMMIT');
+
         res.status(201).json({
             message: 'Instructor created successfully',
-            instructor: result.rows[0]
+            instructor: { ...instructorResult.rows[0], username }
         });
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error('Create instructor error:', error);
         res.status(500).json({ error: 'Failed to create instructor' });
+    } finally {
+        client.release();
     }
 };
 

@@ -11,12 +11,18 @@ const branchesRoutes = require('./routes/branches');
 const studentsRoutes = require('./routes/students');
 const instructorsRoutes = require('./routes/instructors');
 const attendanceRoutes = require('./routes/attendance');
+const attendanceApprovalsRoutes = require('./routes/attendanceApprovals');
+const productsRoutes = require('./routes/products');
+const ordersRoutes = require('./routes/orders');
 const feesRoutes = require('./routes/fees');
 const dashboardRoutes = require('./routes/dashboard');
 const inventoryRoutes = require('./routes/inventory');
 
 // Import error handlers
 const { errorHandler, notFound } = require('./utils/errorHandler');
+
+// Import middleware
+const { generalLimiter, authLimiter, apiLimiter, dataFetchLimiter } = require('./middleware/rateLimiting');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -43,6 +49,10 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Apply rate limiting
+app.use(generalLimiter);
+app.use('/api', apiLimiter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -84,15 +94,191 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/branches', branchesRoutes);
-app.use('/api/students', studentsRoutes);
-app.use('/api/instructors', instructorsRoutes);
+// Database test endpoint
+app.get('/api/test-db', async (req, res) => {
+    try {
+        const pool = require('./db');
+        const result = await pool.query('SELECT NOW() as current_time, version() as postgres_version');
+        res.json({
+            status: 'Database connected',
+            current_time: result.rows[0].current_time,
+            postgres_version: result.rows[0].postgres_version
+        });
+    } catch (error) {
+        console.error('Database test error:', error);
+        res.status(500).json({ error: 'Database connection failed', details: error.message });
+    }
+});
+
+// Database schema test endpoint
+app.get('/api/test-schema', async (req, res) => {
+    try {
+        const pool = require('./db');
+
+        // Check if tables exist
+        const tablesQuery = `
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name IN ('users', 'students', 'branches', 'attendance', 'fees')
+            ORDER BY table_name
+        `;
+        const tablesResult = await pool.query(tablesQuery);
+
+        // Check attendance table structure
+        const attendanceQuery = `
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'attendance' 
+            ORDER BY ordinal_position
+        `;
+        const attendanceResult = await pool.query(attendanceQuery);
+
+        // Count records in each table
+        const counts = {};
+        for (const table of tablesResult.rows) {
+            try {
+                const countResult = await pool.query(`SELECT COUNT(*) as count FROM ${table.table_name}`);
+                counts[table.table_name] = countResult.rows[0].count;
+            } catch (err) {
+                counts[table.table_name] = 'Error: ' + err.message;
+            }
+        }
+
+        res.json({
+            status: 'Schema check complete',
+            tables_found: tablesResult.rows.map(r => r.table_name),
+            table_counts: counts,
+            attendance_columns: attendanceResult.rows
+        });
+    } catch (error) {
+        console.error('Schema test error:', error);
+        res.status(500).json({ error: 'Schema check failed', details: error.message });
+    }
+});
+
+// Create test attendance data endpoint
+app.post('/api/create-test-attendance', async (req, res) => {
+    try {
+        const pool = require('./db');
+
+        // Get students from branch 1 (for instructor1)
+        const studentsQuery = `
+            SELECT id, first_name, last_name 
+            FROM students 
+            WHERE branch_id = 1 AND is_active = true
+            LIMIT 5
+        `;
+        const studentsResult = await pool.query(studentsQuery);
+
+        if (studentsResult.rows.length === 0) {
+            return res.json({ message: 'No students found in branch 1' });
+        }
+
+        // Create attendance records for the last 7 days
+        const attendanceRecords = [];
+        for (let i = 0; i < 7; i++) {
+            const classDate = new Date();
+            classDate.setDate(classDate.getDate() - i);
+
+            for (const student of studentsResult.rows) {
+                attendanceRecords.push({
+                    student_id: student.id,
+                    class_date: classDate.toISOString().split('T')[0],
+                    status: Math.random() > 0.2 ? 'present' : 'absent', // 80% present rate
+                    notes: i === 0 ? 'Test data created' : ''
+                });
+            }
+        }
+
+        // Insert attendance records
+        for (const record of attendanceRecords) {
+            await pool.query(
+                'INSERT INTO attendance (student_id, class_date, status, notes, created_at) VALUES ($1, $2, $3, $4, NOW())',
+                [record.student_id, record.class_date, record.status, record.notes]
+            );
+        }
+
+        res.json({
+            message: `Created ${attendanceRecords.length} test attendance records`,
+            students_used: studentsResult.rows.length,
+            records_created: attendanceRecords.length
+        });
+    } catch (error) {
+        console.error('Test attendance creation error:', error);
+        res.status(500).json({ error: 'Failed to create test data', details: error.message });
+    }
+});
+
+// Check database data endpoint
+app.get('/api/check-data', async (req, res) => {
+    try {
+        const pool = require('./db');
+
+        // Check if we have any data
+        const checks = {};
+
+        // Check users
+        const usersResult = await pool.query('SELECT COUNT(*) as count FROM users');
+        checks.users = usersResult.rows[0].count;
+
+        // Check students
+        const studentsResult = await pool.query('SELECT COUNT(*) as count FROM students');
+        checks.students = studentsResult.rows[0].count;
+
+        // Check branches
+        const branchesResult = await pool.query('SELECT COUNT(*) as count FROM branches');
+        checks.branches = branchesResult.rows[0].count;
+
+        // Check attendance
+        const attendanceResult = await pool.query('SELECT COUNT(*) as count FROM attendance');
+        checks.attendance = attendanceResult.rows[0].count;
+
+        // Check instructor users
+        const instructorResult = await pool.query("SELECT id, username, branch_id FROM users WHERE role = 'instructor'");
+        checks.instructors = instructorResult.rows;
+
+        // Check students by branch
+        const studentsByBranchResult = await pool.query(`
+            SELECT branch_id, COUNT(*) as count 
+            FROM students 
+            GROUP BY branch_id 
+            ORDER BY branch_id
+        `);
+        checks.students_by_branch = studentsByBranchResult.rows;
+
+        // Check attendance by branch
+        const attendanceByBranchResult = await pool.query(`
+            SELECT s.branch_id, COUNT(*) as count 
+            FROM attendance a
+            JOIN students s ON a.student_id = s.id
+            GROUP BY s.branch_id 
+            ORDER BY s.branch_id
+        `);
+        checks.attendance_by_branch = attendanceByBranchResult.rows;
+
+        res.json({
+            status: 'Data check complete',
+            ...checks
+        });
+    } catch (error) {
+        console.error('Data check error:', error);
+        res.status(500).json({ error: 'Data check failed', details: error.message });
+    }
+});
+
+// API routes with rate limiting
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/branches', dataFetchLimiter, branchesRoutes);
+app.use('/api/students', dataFetchLimiter, studentsRoutes);
+app.use('/api/instructors', dataFetchLimiter, instructorsRoutes);
 app.use('/api/attendance', attendanceRoutes);
-app.use('/api/fees', feesRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/inventory', inventoryRoutes);
+app.use('/api/attendance/approval', attendanceApprovalsRoutes);
+app.use('/api/products', dataFetchLimiter, productsRoutes);
+app.use('/api/orders', dataFetchLimiter, ordersRoutes);
+app.use('/api/fees', dataFetchLimiter, feesRoutes);
+app.use('/api/dashboard', dataFetchLimiter, dashboardRoutes);
+app.use('/api/inventory', dataFetchLimiter, inventoryRoutes);
 
 // 404 handler
 app.use(notFound);

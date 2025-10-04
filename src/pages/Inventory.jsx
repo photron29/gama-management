@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import LoadingAtom from '../components/LoadingAtom';
 import {
     FaPlus,
     FaEdit,
@@ -125,7 +126,12 @@ const Inventory = () => {
     const categories = [...new Set(inventory.map(item => item.category).filter(Boolean))];
 
     if (loading) {
-        return <div className="loading">Loading inventory...</div>;
+        return (
+            <div className="table-loading">
+                <LoadingAtom size="medium" />
+                <span>Loading inventory...</span>
+            </div>
+        );
     }
 
     return (

@@ -17,11 +17,6 @@ const Modal = ({
             // Store the currently focused element
             previousActiveElement.current = document.activeElement;
 
-            // Focus the modal
-            if (modalRef.current) {
-                modalRef.current.focus();
-            }
-
             // Prevent body scroll
             document.body.style.overflow = 'hidden';
 
@@ -39,12 +34,12 @@ const Modal = ({
                 document.body.style.overflow = 'unset';
 
                 // Restore focus to the previously focused element
-                if (previousActiveElement.current) {
+                if (previousActiveElement.current && previousActiveElement.current.focus) {
                     previousActiveElement.current.focus();
                 }
             };
         }
-    }, [isOpen, onClose]);
+    }, [isOpen]); // Removed onClose from dependencies
 
     if (!isOpen) return null;
 

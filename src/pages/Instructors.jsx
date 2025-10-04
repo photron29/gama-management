@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import LoadingAtom from '../components/LoadingAtom';
 import {
     FaPlus,
     FaEdit,
     FaTrash,
     FaSearch,
     FaEye,
+    FaEyeSlash,
     FaUser,
     FaPhone,
     FaEnvelope,
@@ -17,7 +19,8 @@ import {
     FaUndo,
     FaExclamationTriangle,
     FaChevronUp,
-    FaChevronDown
+    FaChevronDown,
+    FaFilter
 } from 'react-icons/fa';
 import { apiClient } from '../utils/api';
 import { getInstructorBeltRanks, formatBeltRank } from '../utils/beltRanks';
@@ -32,6 +35,13 @@ const Instructors = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState('last_name');
     const [sortDirection, setSortDirection] = useState('asc');
+
+    // Filter states
+    const [filters, setFilters] = useState({
+        beltLevel: '',
+        branch: ''
+    });
+    const [showFilters, setShowFilters] = useState(false);
     const [showInactive, setShowInactive] = useState(false);
 
     // Modal states
@@ -44,8 +54,11 @@ const Instructors = () => {
     const [viewingInstructor, setViewingInstructor] = useState(null);
     const [deletingInstructor, setDeletingInstructor] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const [formData, setFormData] = useState({
+        username: '',
+        password: '',
         first_name: '',
         last_name: '',
         email: '',
@@ -88,6 +101,20 @@ const Instructors = () => {
         }));
     };
 
+    const handleFilterChange = (filterType, value) => {
+        setFilters(prev => ({
+            ...prev,
+            [filterType]: value
+        }));
+    };
+
+    const clearFilters = () => {
+        setFilters({
+            beltLevel: '',
+            branch: ''
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -103,6 +130,7 @@ const Instructors = () => {
 
             setShowModal(false);
             setEditingInstructor(null);
+            setShowPassword(false);
             resetForm();
             fetchInstructors();
         } catch (error) {
@@ -197,6 +225,8 @@ const Instructors = () => {
 
     const resetForm = () => {
         setFormData({
+            username: '',
+            password: '',
             first_name: '',
             last_name: '',
             email: '',
@@ -236,13 +266,23 @@ const Instructors = () => {
 
     const filteredInstructors = (instructors || []).filter(instructor => {
         const searchLower = searchTerm.toLowerCase();
-        return (
+        const matchesSearch = (
             instructor.first_name.toLowerCase().includes(searchLower) ||
             instructor.last_name.toLowerCase().includes(searchLower) ||
             instructor.email.toLowerCase().includes(searchLower) ||
             instructor.phone.includes(searchTerm) ||
             instructor.branch_name.toLowerCase().includes(searchLower)
         );
+
+        // Belt level filter
+        const matchesBelt = !filters.beltLevel || instructor.belt_level === filters.beltLevel;
+
+        // Branch filter
+        const matchesBranch = !filters.branch || instructor.branch_id === parseInt(filters.branch);
+
+        // Specialization filter
+
+        return matchesSearch && matchesBelt && matchesBranch;
     });
 
     const sortedInstructors = [...filteredInstructors].sort((a, b) => {
@@ -287,7 +327,7 @@ const Instructors = () => {
     if (loading) {
         return (
             <div className="table-loading">
-                <div className="loading-spinner"></div>
+                <LoadingAtom size="medium" />
                 <span>Loading instructors...</span>
             </div>
         );
@@ -314,6 +354,62 @@ const Instructors = () => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                </div>
+
+                <div className="filter-controls">
+                    <button
+                        className="btn btn-secondary"
+                        onClick={() => setShowFilters(!showFilters)}
+                    >
+                        <FaFilter /> Filters
+                        {(filters.beltLevel || filters.branch) && (
+                            <span className="filter-badge">
+                                {[filters.beltLevel, filters.branch].filter(Boolean).length}
+                            </span>
+                        )}
+                    </button>
+
+                    {showFilters && (
+                        <div className="filter-panel">
+                            <div className="filter-row">
+                                <div className="filter-group">
+                                    <label>Belt Level</label>
+                                    <select
+                                        value={filters.beltLevel}
+                                        onChange={(e) => handleFilterChange('beltLevel', e.target.value)}
+                                    >
+                                        <option value="">All Belts</option>
+                                        {getInstructorBeltRanks().map(belt => (
+                                            <option key={belt} value={belt}>{formatBeltRank(belt)}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="filter-group">
+                                    <label>Branch</label>
+                                    <select
+                                        value={filters.branch}
+                                        onChange={(e) => handleFilterChange('branch', e.target.value)}
+                                    >
+                                        <option value="">All Branches</option>
+                                        {branches.map(branch => (
+                                            <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                            </div>
+
+                            <div className="filter-actions">
+                                <button
+                                    className="btn btn-outline"
+                                    onClick={clearFilters}
+                                >
+                                    Clear Filters
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -706,12 +802,59 @@ const Instructors = () => {
                 onClose={() => {
                     setShowModal(false);
                     setEditingInstructor(null);
+                    setShowPassword(false);
                     resetForm();
                 }}
                 title={editingInstructor ? 'Edit Instructor' : 'Add New Instructor'}
                 size="large"
             >
                 <form onSubmit={handleSubmit}>
+                    {!editingInstructor && (
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label htmlFor="username">Username *</label>
+                                <input
+                                    type="text"
+                                    id="username"
+                                    name="username"
+                                    value={formData.username}
+                                    onChange={handleInputChange}
+                                    required={!editingInstructor}
+                                    placeholder="Login username"
+                                />
+                                <small className="form-help">
+                                    Instructor will use this to login
+                                </small>
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="password">Password *</label>
+                                <div className="password-input-wrapper">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        id="password"
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleInputChange}
+                                        required={!editingInstructor}
+                                        placeholder="Login password"
+                                        minLength="6"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="password-toggle-btn"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                                    </button>
+                                </div>
+                                <small className="form-help">
+                                    Minimum 6 characters
+                                </small>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="form-row">
                         <div className="form-group">
                             <label htmlFor="first_name">First Name *</label>
@@ -849,6 +992,7 @@ const Instructors = () => {
                             onClick={() => {
                                 setShowModal(false);
                                 setEditingInstructor(null);
+                                setShowPassword(false);
                                 resetForm();
                             }}
                         >

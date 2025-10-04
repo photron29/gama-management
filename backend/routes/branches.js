@@ -9,11 +9,11 @@ const {
     deleteBranch
 } = require('../controllers/branchesController');
 
-// Get all branches (Admin only)
-router.get('/', authenticateToken, authorizeRole(['admin']), getBranches);
+// Get all branches (Admin and Instructor can read)
+router.get('/', authenticateToken, authorizeRole(['admin', 'instructor']), getBranches);
 
-// Get single branch
-router.get('/:id', authenticateToken, authorizeRole(['admin']), getBranch);
+// Get single branch (Admin and Instructor can read)
+router.get('/:id', authenticateToken, authorizeRole(['admin', 'instructor']), getBranch);
 
 // Create new branch
 router.post('/', authenticateToken, authorizeRole(['admin']), createBranch);

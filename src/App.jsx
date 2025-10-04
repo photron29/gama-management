@@ -7,6 +7,8 @@ import './styles/components.css';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import LoadingAtom from './components/LoadingAtom';
+import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Branches from './pages/Branches';
@@ -17,11 +19,23 @@ import Instructors from './pages/Instructors';
 import Attendance from './pages/Attendance';
 import Fees from './pages/Fees';
 import Inventory from './pages/Inventory';
+import Products from './pages/Products';
+import MyOrders from './pages/MyOrders';
+import Orders from './pages/Orders';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function AppRoutes() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="app-loading">
+        <LoadingAtom size="medium" />
+        <p>Loading application...</p>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -33,42 +47,59 @@ function AppRoutes() {
   }
 
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/branches" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <Branches />
-          </ProtectedRoute>
-        } />
-        <Route path="/schools" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <Schools />
-          </ProtectedRoute>
-        } />
-        <Route path="/students" element={<Students />} />
-        <Route path="/students/inactive" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <InactiveStudents />
-          </ProtectedRoute>
-        } />
-        <Route path="/instructors" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <Instructors />
-          </ProtectedRoute>
-        } />
-        <Route path="/attendance" element={<Attendance />} />
-        <Route path="/fees" element={<Fees />} />
-        <Route path="/inventory" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <Inventory />
-          </ProtectedRoute>
-        } />
-        <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </Layout>
+    <ErrorBoundary>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/branches" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Branches />
+            </ProtectedRoute>
+          } />
+          <Route path="/schools" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Schools />
+            </ProtectedRoute>
+          } />
+          <Route path="/students" element={<Students />} />
+          <Route path="/students/inactive" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <InactiveStudents />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructors" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Instructors />
+            </ProtectedRoute>
+          } />
+          <Route path="/attendance" element={<Attendance />} />
+          <Route path="/fees" element={<Fees />} />
+          <Route path="/inventory" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Inventory />
+            </ProtectedRoute>
+          } />
+          <Route path="/products" element={
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <Products />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders" element={
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <MyOrders />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/orders" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Orders />
+            </ProtectedRoute>
+          } />
+          <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Layout>
+    </ErrorBoundary>
   );
 }
 

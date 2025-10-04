@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { apiClient } from '../utils/api';
 
 const AuthContext = createContext();
 
@@ -67,13 +68,20 @@ export const AuthProvider = ({ children }) => {
         }
     }, []);
 
-    const login = (user, token) => {
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        dispatch({
-            type: 'LOGIN_SUCCESS',
-            payload: { user, token }
-        });
+    const login = async (username, password) => {
+        try {
+            const response = await apiClient.login({ username, password });
+            localStorage.setItem('token', response.token);
+            localStorage.setItem('user', JSON.stringify(response.user));
+            dispatch({
+                type: 'LOGIN_SUCCESS',
+                payload: { user: response.user, token: response.token }
+            });
+            return { success: true };
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error;
+        }
     };
 
     const logout = () => {

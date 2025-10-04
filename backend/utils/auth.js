@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const pool = require('../db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 
 // Generate JWT token
 const generateToken = (user) => {
@@ -22,6 +23,20 @@ const verifyToken = (token) => {
     try {
         return jwt.verify(token, JWT_SECRET);
     } catch (error) {
+        return null;
+    }
+};
+
+// Verify Supabase JWT token
+const verifySupabaseToken = (token) => {
+    try {
+        if (!SUPABASE_JWT_SECRET) {
+            console.warn('SUPABASE_JWT_SECRET not set, using fallback verification');
+            return jwt.decode(token);
+        }
+        return jwt.verify(token, SUPABASE_JWT_SECRET);
+    } catch (error) {
+        console.error('Supabase token verification error:', error);
         return null;
     }
 };
@@ -52,6 +67,7 @@ const authenticateToken = async (req, res, next) => {
         }
 
         req.user = result.rows[0];
+        console.log('Authenticated user:', { id: req.user.id, username: req.user.username, role: req.user.role, branch_id: req.user.branch_id });
         next();
     } catch (error) {
         console.error('Authentication error:', error);
@@ -66,7 +82,10 @@ const authorizeRole = (roles) => {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
+        console.log('Role check:', { userRole: req.user.role, allowedRoles: roles, path: req.path });
+
         if (!roles.includes(req.user.role)) {
+            console.log('Access denied:', { userRole: req.user.role, allowedRoles: roles });
             return res.status(403).json({ error: 'Insufficient permissions' });
         }
 

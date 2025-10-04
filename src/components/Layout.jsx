@@ -15,7 +15,9 @@ import {
     FaSun,
     FaMoon,
     FaSchool,
-    FaMapMarkerAlt
+    FaMapMarkerAlt,
+    FaShoppingCart,
+    FaShoppingBag
 } from 'react-icons/fa';
 
 const Layout = ({ children }) => {
@@ -39,7 +41,10 @@ const Layout = ({ children }) => {
         { path: '/students/inactive', label: 'Inactive Students', icon: FaUsers, roles: ['admin'] },
         { path: '/attendance', label: 'Attendance', icon: FaClipboardCheck, roles: ['admin', 'instructor'] },
         { path: '/fees', label: 'Fees', icon: FaRupeeSign, roles: ['admin', 'instructor'] },
-        { path: '/inventory', label: 'Inventory', icon: FaBox, roles: ['admin'] }
+        { path: '/inventory', label: 'Inventory', icon: FaBox, roles: ['admin'] },
+        { path: '/admin/orders', label: 'Orders', icon: FaShoppingBag, roles: ['admin'] },
+        { path: '/products', label: 'Products', icon: FaShoppingCart, roles: ['instructor'] },
+        { path: '/orders', label: 'My Orders', icon: FaShoppingBag, roles: ['instructor'] }
     ];
 
     const filteredNavItems = navigationItems.filter(item =>
@@ -106,9 +111,6 @@ const Layout = ({ children }) => {
                     >
                         <HamburgerIcon isOpen={sidebarOpen} />
                     </button>
-                    <h1 className="page-title">
-                        {filteredNavItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
-                    </h1>
                     <div className="top-bar-actions">
                         <button
                             className="theme-toggle"

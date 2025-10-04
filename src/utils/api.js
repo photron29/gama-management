@@ -1,4 +1,3 @@
-// Force production URL for deployed frontend
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://gama-backend.onrender.com/api';
 
 class ApiClient {
@@ -155,6 +154,76 @@ class ApiClient {
 
     async deleteAttendance(id) {
         return this.request(`/attendance/${id}`, { method: 'DELETE' });
+    }
+
+    async createAttendanceApproval(approvalData) {
+        return this.request('/attendance/approval', {
+            method: 'POST',
+            body: JSON.stringify(approvalData)
+        });
+    }
+
+    async getAttendanceApprovals() {
+        return this.request('/attendance/approvals');
+    }
+
+    async updateAttendanceApproval(id, status) {
+        return this.request(`/attendance/approval/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status })
+        });
+    }
+
+    // Products endpoints
+    async getProducts() {
+        return this.request('/products');
+    }
+
+    async getProduct(id) {
+        return this.request(`/products/${id}`);
+    }
+
+    async getProductsByCategory(category) {
+        return this.request(`/products/category/${category}`);
+    }
+
+    async getProductCategories() {
+        return this.request('/products/categories/list');
+    }
+
+    // Orders endpoints
+    async createOrder(orderData) {
+        return this.request('/orders', {
+            method: 'POST',
+            body: JSON.stringify(orderData)
+        });
+    }
+
+    async getMyOrders() {
+        return this.request('/orders/my-orders');
+    }
+
+    async getOrder(id) {
+        return this.request(`/orders/${id}`);
+    }
+
+    async getAllOrders() {
+        return this.request('/orders');
+    }
+
+    async getOrders() {
+        return this.request('/orders');
+    }
+
+    async updateOrderStatus(id, statusData) {
+        return this.request(`/orders/${id}/status`, {
+            method: 'PUT',
+            body: JSON.stringify(statusData)
+        });
+    }
+
+    async getOrderStats() {
+        return this.request('/orders/stats/overview');
     }
 
     // Fees endpoints

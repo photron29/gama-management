@@ -120,3 +120,31 @@ INSERT INTO inventory (item_name, category, quantity, unit_price, branch_id, sup
 ('Karate Gi (White)', 'Uniforms', 18, 45.00, 3, 'Martial Arts Supply Co', CURRENT_DATE - INTERVAL '20 days'),
 ('Belt (White)', 'Belts', 35, 8.00, 3, 'Belt Masters', CURRENT_DATE - INTERVAL '5 days'),
 ('Sparring Gloves', 'Equipment', 12, 35.00, 3, 'Training Gear Inc', CURRENT_DATE - INTERVAL '35 days');
+
+-- Additional inventory items for e-commerce
+INSERT INTO inventory (item_name, category, quantity, unit_price, branch_id, supplier, last_restocked) VALUES
+-- Belts
+('White Belt', 'Belts', 100, 8.00, 1, 'Belt Masters', CURRENT_DATE - INTERVAL '5 days'),
+('Yellow Belt', 'Belts', 75, 8.00, 1, 'Belt Masters', CURRENT_DATE - INTERVAL '5 days'),
+('Orange Belt', 'Belts', 60, 8.00, 1, 'Belt Masters', CURRENT_DATE - INTERVAL '5 days'),
+('Green Belt', 'Belts', 50, 8.00, 1, 'Belt Masters', CURRENT_DATE - INTERVAL '5 days'),
+('Blue Belt', 'Belts', 45, 8.00, 1, 'Belt Masters', CURRENT_DATE - INTERVAL '5 days'),
+('Brown Belt', 'Belts', 30, 8.00, 1, 'Belt Masters', CURRENT_DATE - INTERVAL '5 days'),
+('Black Belt', 'Belts', 20, 12.00, 1, 'Belt Masters', CURRENT_DATE - INTERVAL '5 days'),
+
+-- Equipment
+('Focus Pads', 'Equipment', 40, 25.00, 1, 'Training Gear Inc', CURRENT_DATE - INTERVAL '10 days'),
+('Shin Guards', 'Equipment', 25, 28.00, 1, 'Training Gear Inc', CURRENT_DATE - INTERVAL '10 days'),
+('Mouth Guard', 'Equipment', 50, 15.00, 1, 'Training Gear Inc', CURRENT_DATE - INTERVAL '10 days'),
+('Training Dummy', 'Equipment', 10, 80.00, 1, 'Training Gear Inc', CURRENT_DATE - INTERVAL '10 days'),
+
+-- Accessories
+('Karate Bag', 'Accessories', 40, 20.00, 1, 'Martial Arts Supply Co', CURRENT_DATE - INTERVAL '15 days'),
+('Water Bottle', 'Accessories', 60, 12.00, 1, 'Martial Arts Supply Co', CURRENT_DATE - INTERVAL '15 days'),
+('Towel', 'Accessories', 80, 8.00, 1, 'Martial Arts Supply Co', CURRENT_DATE - INTERVAL '15 days'),
+('Headband', 'Accessories', 100, 5.00, 1, 'Martial Arts Supply Co', CURRENT_DATE - INTERVAL '15 days'),
+
+-- Books & Media
+('Karate Basics Book', 'Books', 25, 15.00, 1, 'Educational Materials Co', CURRENT_DATE - INTERVAL '30 days'),
+('Advanced Techniques DVD', 'Books', 15, 25.00, 1, 'Educational Materials Co', CURRENT_DATE - INTERVAL '30 days'),
+('Training Manual', 'Books', 20, 18.00, 1, 'Educational Materials Co', CURRENT_DATE - INTERVAL '30 days');

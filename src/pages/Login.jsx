@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
-import { apiClient } from '../utils/api';
 
 const Login = () => {
     const [formData, setFormData] = useState({
@@ -27,11 +26,11 @@ const Login = () => {
         setLoading(true);
 
         try {
-            const response = await apiClient.login(formData);
-            login(response.user, response.token);
+            await login(formData.username, formData.password);
             toast.success('Login successful!');
             navigate('/dashboard');
         } catch (error) {
+            console.error('Login error:', error);
             toast.error(error.message || 'Login failed');
         } finally {
             setLoading(false);
@@ -96,15 +95,7 @@ const Login = () => {
                 </form>
 
                 <div className="login-footer">
-                    <p>Demo Credentials:</p>
-                    <div className="demo-credentials">
-                        <div>
-                            <strong>Admin:</strong> admin / password
-                        </div>
-                        <div>
-                            <strong>Instructor:</strong> instructor1 / password
-                        </div>
-                    </div>
+                    <p>Enter your credentials to access the system</p>
                 </div>
             </div>
         </div>

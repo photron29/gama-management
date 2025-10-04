@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import LoadingAtom from '../components/LoadingAtom';
+import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import {
     FaPlus,
     FaEdit,
@@ -13,7 +16,9 @@ import {
     FaMapMarkerAlt,
     FaSort,
     FaSortUp,
-    FaSortDown
+    FaSortDown,
+    FaFilter,
+    FaSyncAlt
 } from 'react-icons/fa';
 import { apiClient } from '../utils/api';
 import { getStudentBeltRanks, formatBeltRank } from '../utils/beltRanks';
@@ -21,12 +26,24 @@ import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 const Students = () => {
+    const { isDarkMode } = useTheme();
+    const { user } = useAuth();
     const [students, setStudents] = useState([]);
     const [branches, setBranches] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState('last_name');
     const [sortDirection, setSortDirection] = useState('asc');
+
+    // Filter states
+    const [filters, setFilters] = useState({
+        beltLevel: '',
+        branch: '',
+        status: '',
+        ageRange: ''
+    });
+    const [showFilters, setShowFilters] = useState(false);
 
     // Modal states
     const [showModal, setShowModal] = useState(false);
@@ -70,6 +87,24 @@ const Students = () => {
         }
     };
 
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            const [studentsData, branchesData] = await Promise.all([
+                apiClient.getStudents(),
+                apiClient.getBranches()
+            ]);
+            setStudents(studentsData.students || []);
+            setBranches(branchesData);
+            toast.success('Data refreshed successfully');
+        } catch (error) {
+            console.error('Error refreshing data:', error);
+            toast.error('Failed to refresh data');
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({
@@ -78,16 +113,50 @@ const Students = () => {
         }));
     };
 
+    const handleFilterChange = (filterType, value) => {
+        setFilters(prev => ({
+            ...prev,
+            [filterType]: value
+        }));
+    };
+
+    const clearFilters = () => {
+        setFilters({
+            beltLevel: '',
+            branch: '',
+            status: '',
+            ageRange: ''
+        });
+    };
+
+    const getAgeFromDOB = (dateOfBirth) => {
+        if (!dateOfBirth) return 0;
+        const today = new Date();
+        const birthDate = new Date(dateOfBirth);
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
 
         try {
+            // For instructors, don't send branch_id when updating (they can't change branches)
+            let dataToSend = { ...formData };
+            if (editingStudent && user?.role === 'instructor') {
+                delete dataToSend.branch_id;
+            }
+
             if (editingStudent) {
-                await apiClient.updateStudent(editingStudent.id, formData);
+                await apiClient.updateStudent(editingStudent.id, dataToSend);
                 toast.success('Student updated successfully');
             } else {
-                await apiClient.createStudent(formData);
+                await apiClient.createStudent(dataToSend);
                 toast.success('Student created successfully');
             }
 
@@ -96,8 +165,9 @@ const Students = () => {
             resetForm();
             fetchStudents();
         } catch (error) {
-            console.error('Error saving student:', error);
-            toast.error(error.response?.data?.error || 'Failed to save student');
+            // Show user-friendly error message instead of console error
+            const errorMessage = error.response?.data?.error || 'Failed to save student';
+            toast.error(errorMessage);
         } finally {
             setIsSubmitting(false);
         }
@@ -186,13 +256,45 @@ const Students = () => {
 
     const filteredStudents = (students || []).filter(student => {
         const searchLower = searchTerm.toLowerCase();
-        return (
+        const matchesSearch = (
             student.first_name.toLowerCase().includes(searchLower) ||
             student.last_name.toLowerCase().includes(searchLower) ||
             student.email.toLowerCase().includes(searchLower) ||
             student.phone.includes(searchTerm) ||
             student.branch_name.toLowerCase().includes(searchLower)
         );
+
+        // Belt level filter
+        const matchesBelt = !filters.beltLevel || student.belt_level === filters.beltLevel;
+
+        // Branch filter
+        const matchesBranch = !filters.branch || student.branch_id === parseInt(filters.branch);
+
+        // Status filter
+        const matchesStatus = !filters.status ||
+            (filters.status === 'active' && student.is_active) ||
+            (filters.status === 'inactive' && !student.is_active);
+
+        // Age range filter
+        const age = getAgeFromDOB(student.date_of_birth);
+        let matchesAge = true;
+        if (filters.ageRange) {
+            switch (filters.ageRange) {
+                case 'children':
+                    matchesAge = age < 13;
+                    break;
+                case 'teens':
+                    matchesAge = age >= 13 && age < 18;
+                    break;
+                case 'adults':
+                    matchesAge = age >= 18;
+                    break;
+                default:
+                    matchesAge = true;
+            }
+        }
+
+        return matchesSearch && matchesBelt && matchesBranch && matchesStatus && matchesAge;
     });
 
     const sortedStudents = [...filteredStudents].sort((a, b) => {
@@ -222,8 +324,9 @@ const Students = () => {
     };
 
     const getBeltColor = (beltLevel) => {
+        // Theme-aware belt colors for better contrast
         const colors = {
-            'white': '#ffffff',
+            'white': isDarkMode ? '#e5e7eb' : '#6b7280', // Light gray for dark mode, darker gray for light mode
             'yellow stripe': '#fbbf24',
             'yellow': '#f59e0b',
             'green stripe': '#10b981',
@@ -232,7 +335,7 @@ const Students = () => {
             'blue': '#2563eb',
             'red stripe': '#ef4444',
             'red': '#dc2626',
-            'black stripe': '#1f2937',
+            'black stripe': isDarkMode ? '#9ca3af' : '#1f2937', // Lighter for dark mode, darker for light mode
             'Dan 1': '#7c3aed',
             'Dan 2': '#5b21b6',
             'Dan 3': '#4c1d95'
@@ -243,7 +346,7 @@ const Students = () => {
     if (loading) {
         return (
             <div className="table-loading">
-                <div className="loading-spinner"></div>
+                <LoadingAtom size="medium" />
                 <span>Loading students...</span>
             </div>
         );
@@ -270,6 +373,86 @@ const Students = () => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                </div>
+
+                <div className="filter-controls">
+                    <button
+                        className="btn btn-secondary"
+                        onClick={() => setShowFilters(!showFilters)}
+                    >
+                        <FaFilter /> Filters
+                        {(filters.beltLevel || filters.branch || filters.status || filters.ageRange) && (
+                            <span className="filter-badge">
+                                {[filters.beltLevel, filters.branch, filters.status, filters.ageRange].filter(Boolean).length}
+                            </span>
+                        )}
+                    </button>
+
+                    {showFilters && (
+                        <div className="filter-panel">
+                            <div className="filter-row">
+                                <div className="filter-group">
+                                    <label>Belt Level</label>
+                                    <select
+                                        value={filters.beltLevel}
+                                        onChange={(e) => handleFilterChange('beltLevel', e.target.value)}
+                                    >
+                                        <option value="">All Belts</option>
+                                        {getStudentBeltRanks().map(belt => (
+                                            <option key={belt} value={belt}>{formatBeltRank(belt)}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="filter-group">
+                                    <label>Branch</label>
+                                    <select
+                                        value={filters.branch}
+                                        onChange={(e) => handleFilterChange('branch', e.target.value)}
+                                    >
+                                        <option value="">All Branches</option>
+                                        {branches.map(branch => (
+                                            <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="filter-group">
+                                    <label>Status</label>
+                                    <select
+                                        value={filters.status}
+                                        onChange={(e) => handleFilterChange('status', e.target.value)}
+                                    >
+                                        <option value="">All Status</option>
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+
+                                <div className="filter-group">
+                                    <label>Age Range</label>
+                                    <select
+                                        value={filters.ageRange}
+                                        onChange={(e) => handleFilterChange('ageRange', e.target.value)}
+                                    >
+                                        <option value="">All Ages</option>
+                                        <option value="children">Children (Under 13)</option>
+                                        <option value="teens">Teens (13-17)</option>
+                                        <option value="adults">Adults (18+)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="filter-actions">
+                                <button
+                                    className="btn btn-outline"
+                                    onClick={clearFilters}
+                                >
+                                    Clear Filters
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -626,6 +809,7 @@ const Students = () => {
                             value={formData.branch_id}
                             onChange={handleInputChange}
                             required
+                            disabled={editingStudent && user?.role === 'instructor'}
                         >
                             <option value="">Select Branch</option>
                             {branches.map(branch => (
@@ -634,6 +818,11 @@ const Students = () => {
                                 </option>
                             ))}
                         </select>
+                        {editingStudent && user?.role === 'instructor' && (
+                            <small className="form-help">
+                                Branch cannot be changed for existing students
+                            </small>
+                        )}
                     </div>
 
                     <div className="form-row">

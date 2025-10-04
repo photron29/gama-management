@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import LoadingAtom from '../components/LoadingAtom';
 import {
     FaTrash,
     FaUndo,
@@ -69,8 +70,9 @@ const InactiveStudents = () => {
 
     if (loading) {
         return (
-            <div className="page-content">
-                <div className="loading">Loading inactive students...</div>
+            <div className="table-loading">
+                <LoadingAtom size="medium" />
+                <span>Loading inactive students...</span>
             </div>
         );
     }

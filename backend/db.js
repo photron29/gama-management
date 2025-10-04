@@ -7,6 +7,8 @@ const pool = new Pool({
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
+    // Set client timezone to Asia/Kolkata to match database
+    options: '-c timezone=Asia/Kolkata'
 });
 
 // Test database connection

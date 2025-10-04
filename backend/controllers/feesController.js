@@ -88,21 +88,30 @@ const getFeeById = async (req, res) => {
     }
 };
 
-// Create fee record
+// Create fee record (with upsert logic)
 const createFee = async (req, res) => {
     try {
+        console.log('=== Create Fee Request ===');
+        console.log('Body:', JSON.stringify(req.body, null, 2));
+        console.log('User:', req.user);
+
         const {
             student_id,
             amount,
             fee_type,
             due_date,
+            status,
             payment_method,
             notes
         } = req.body;
 
         // Validate required fields
-        if (!student_id || !amount || !fee_type) {
-            return res.status(400).json({ error: 'Student ID, amount, and fee type are required' });
+        if (!student_id || !amount || !fee_type || !due_date) {
+            console.log('Validation failed:', { student_id, amount, fee_type, due_date });
+            return res.status(400).json({
+                error: 'Student ID, amount, fee type, and due date are required',
+                received: { student_id, amount, fee_type, due_date }
+            });
         }
 
         // Check if student exists and user has access
@@ -119,21 +128,73 @@ const createFee = async (req, res) => {
             return res.status(404).json({ error: 'Student not found or access denied' });
         }
 
-        const result = await pool.query(
-            `INSERT INTO fees (
-        student_id, amount, fee_type, due_date, payment_method, notes, recorded_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7) 
-      RETURNING *`,
-            [student_id, amount, fee_type, due_date, payment_method, notes, req.user.id]
+        // Check if fee record already exists for this student and month
+        // Ensure due_date is properly formatted
+        let dueDateStr = due_date;
+        if (typeof due_date === 'string' && !due_date.includes('T')) {
+            dueDateStr = due_date; // Already in YYYY-MM-DD format
+        }
+        
+        const dueDate = new Date(dueDateStr + 'T12:00:00'); // Add time to avoid timezone issues
+        const year = dueDate.getFullYear();
+        const month = dueDate.getMonth() + 1;
+        
+        console.log('Fee date processing:', { 
+            original_due_date: due_date, 
+            processed_date: dueDateStr,
+            parsed_date: dueDate,
+            year, 
+            month, 
+            student_id, 
+            fee_type 
+        });
+        
+        const existingRecord = await pool.query(
+            `SELECT * FROM fees 
+             WHERE student_id = $1 
+             AND EXTRACT(YEAR FROM due_date) = $2 
+             AND EXTRACT(MONTH FROM due_date) = $3
+             AND fee_type = $4`,
+            [student_id, year, month, fee_type]
         );
 
+        let result;
+        if (existingRecord.rows.length > 0) {
+            // Update existing record
+            const paid_date = status === 'paid' ? new Date().toISOString().split('T')[0] : null;
+            result = await pool.query(
+                `UPDATE fees SET 
+                    amount = $1,
+                    status = $2,
+                    payment_method = $3,
+                    paid_date = $4,
+                    notes = $5,
+                    recorded_by = $6
+                 WHERE id = $7
+                 RETURNING *`,
+                [amount, status, payment_method, paid_date, notes, req.user.id, existingRecord.rows[0].id]
+            );
+        } else {
+            // Create new record
+            const paid_date = status === 'paid' ? new Date().toISOString().split('T')[0] : null;
+            result = await pool.query(
+                `INSERT INTO fees (
+            student_id, amount, fee_type, due_date, status, payment_method, paid_date, notes, recorded_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+          RETURNING *`,
+                [student_id, amount, fee_type, due_date, status, payment_method, paid_date, notes, req.user.id]
+            );
+        }
+
         res.status(201).json({
-            message: 'Fee record created successfully',
+            message: 'Fee record saved successfully',
             fee: result.rows[0]
         });
     } catch (error) {
         console.error('Create fee error:', error);
-        res.status(500).json({ error: 'Failed to create fee record' });
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({ error: 'Failed to create fee record', details: error.message });
     }
 };
 

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaMapMarkerAlt, FaSearch, FaEye, FaPhone, FaEnvelope, FaUser, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import LoadingAtom from '../components/LoadingAtom';
 import { apiClient } from '../utils/api';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 const Branches = () => {
     const [branches, setBranches] = useState([]);
+    const [instructors, setInstructors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState('name');
@@ -26,7 +28,7 @@ const Branches = () => {
         address: '',
         phone: '',
         email: '',
-        manager: ''
+        manager_id: ''
     });
 
     useEffect(() => {
@@ -36,8 +38,12 @@ const Branches = () => {
     const fetchBranches = async () => {
         try {
             setLoading(true);
-            const data = await apiClient.getBranches();
-            setBranches(data || []);
+            const [branchesData, instructorsData] = await Promise.all([
+                apiClient.getBranches(),
+                apiClient.getInstructors()
+            ]);
+            setBranches(branchesData || []);
+            setInstructors(instructorsData.instructors || []);
         } catch (error) {
             console.error('Error fetching branches:', error);
             toast.error('Failed to fetch branches');
@@ -86,7 +92,7 @@ const Branches = () => {
             address: branch.address,
             phone: branch.phone,
             email: branch.email,
-            manager: branch.manager
+            manager_id: branch.manager_id || ''
         });
         setShowModal(true);
     };
@@ -122,7 +128,7 @@ const Branches = () => {
             address: '',
             phone: '',
             email: '',
-            manager: ''
+            manager_id: ''
         });
     };
 
@@ -180,7 +186,7 @@ const Branches = () => {
     if (loading) {
         return (
             <div className="table-loading">
-                <div className="loading-spinner"></div>
+                <LoadingAtom size="medium" />
                 <span>Loading branches...</span>
             </div>
         );
@@ -468,14 +474,23 @@ const Branches = () => {
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="manager">Manager</label>
-                        <input
-                            type="text"
-                            id="manager"
-                            name="manager"
-                            value={formData.manager}
+                        <label htmlFor="manager_id">Manager</label>
+                        <select
+                            id="manager_id"
+                            name="manager_id"
+                            value={formData.manager_id}
                             onChange={handleInputChange}
-                        />
+                        >
+                            <option value="">Select Manager</option>
+                            {instructors.map(instructor => (
+                                <option key={instructor.id} value={instructor.id}>
+                                    {instructor.first_name} {instructor.last_name} - {instructor.branch_name}
+                                </option>
+                            ))}
+                        </select>
+                        <small className="form-help">
+                            Select an instructor to manage this branch
+                        </small>
                     </div>
 
                     <div className="modal-footer">
