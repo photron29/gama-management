@@ -87,6 +87,8 @@ const createInstructor = async (req, res) => {
             return res.status(403).json({ error: 'Access denied: Admin role required' });
         }
 
+        console.log('🔍 Creating instructor with data:', req.body);
+
         const {
             username,
             password,
@@ -103,6 +105,9 @@ const createInstructor = async (req, res) => {
         if (!first_name || !last_name || !username || !password) {
             return res.status(400).json({ error: 'First name, last name, username, and password are required' });
         }
+
+        // Convert belt_level_id to integer if provided
+        const beltLevelId = belt_level_id ? parseInt(belt_level_id) : null;
 
         await client.query('BEGIN');
 
@@ -125,7 +130,7 @@ const createInstructor = async (req, res) => {
             `INSERT INTO users (username, email, password_hash, role, first_name, last_name, phone, belt_level_id)
              VALUES ($1, $2, $3, 'instructor', $4, $5, $6, $7)
              RETURNING id`,
-            [username, email, password_hash, first_name, last_name, phone, belt_level_id]
+            [username, email, password_hash, first_name, last_name, phone, beltLevelId]
         );
 
         const user_id = userResult.rows[0].id;
@@ -138,7 +143,7 @@ const createInstructor = async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true) 
       RETURNING *`,
             [
-                user_id, first_name, last_name, email, phone, belt_level_id,
+                user_id, first_name, last_name, email, phone, beltLevelId,
                 specialization, certification_date
             ]
         );
@@ -178,6 +183,9 @@ const updateInstructor = async (req, res) => {
             is_active
         } = req.body;
 
+        // Convert belt_level_id to integer if provided
+        const beltLevelId = belt_level_id ? parseInt(belt_level_id) : null;
+
         const result = await pool.query(
             `UPDATE instructors SET 
         first_name = COALESCE($1, first_name),
@@ -193,7 +201,7 @@ const updateInstructor = async (req, res) => {
       WHERE id = $10 
       RETURNING *`,
             [
-                first_name, last_name, email, phone, belt_level_id,
+                first_name, last_name, email, phone, beltLevelId,
                 branch_id, specialization, certification_date, is_active, id
             ]
         );

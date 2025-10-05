@@ -106,6 +106,9 @@ const createStudent = async (req, res) => {
             return res.status(400).json({ error: 'First name, last name, and branch are required' });
         }
 
+        // Convert belt_level_id to integer if provided
+        const beltLevelId = belt_level_id ? parseInt(belt_level_id) : null;
+
         // For instructors, ensure they can only create students in their branch
         if (req.user.role === 'instructor' && branch_id !== req.user.branch_id) {
             return res.status(403).json({ error: 'Cannot create student in different branch' });
@@ -118,7 +121,7 @@ const createStudent = async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
       RETURNING *`,
             [
-                first_name, last_name, email, phone, date_of_birth, belt_level_id,
+                first_name, last_name, email, phone, date_of_birth, beltLevelId,
                 branch_id, emergency_contact_name, emergency_contact_phone, address
             ]
         );
@@ -150,6 +153,9 @@ const updateStudent = async (req, res) => {
             address,
             is_active
         } = req.body;
+
+        // Convert belt_level_id to integer if provided
+        const beltLevelId = belt_level_id ? parseInt(belt_level_id) : null;
 
         // Check if student exists and user has access
         let checkQuery = 'SELECT * FROM students WHERE id = $1';
@@ -187,7 +193,7 @@ const updateStudent = async (req, res) => {
       WHERE id = $12 
       RETURNING *`,
             [
-                first_name, last_name, email, phone, date_of_birth, belt_level_id,
+                first_name, last_name, email, phone, date_of_birth, beltLevelId,
                 branch_id, emergency_contact_name, emergency_contact_phone, address,
                 is_active, id
             ]
