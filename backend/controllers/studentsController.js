@@ -6,9 +6,10 @@ const getStudents = async (req, res) => {
         const { include_inactive } = req.query;
 
         let query = `
-      SELECT s.*, b.name as branch_name 
+      SELECT s.*, b.name as branch_name, br.belt_name, br.belt_color, br.stripe_level, br.dan_level
       FROM students s 
       JOIN branches b ON s.branch_id = b.id
+      LEFT JOIN belt_ranks br ON s.belt_level_id = br.id
       WHERE s.is_active = true
     `;
         let params = [];

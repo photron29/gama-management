@@ -9,10 +9,12 @@ const getInstructors = async (req, res) => {
         }
 
         const result = await pool.query(`
-      SELECT i.*, b.name as branch_name, u.username, u.email as user_email
+      SELECT i.*, b.name as branch_name, u.username, u.email as user_email,
+             br.belt_name, br.belt_color, br.stripe_level, br.dan_level
       FROM instructors i
       JOIN branches b ON i.branch_id = b.id
       LEFT JOIN users u ON i.user_id = u.id
+      LEFT JOIN belt_ranks br ON i.belt_level_id = br.id
       WHERE i.is_active = true
       ORDER BY i.last_name, i.first_name
     `);
@@ -32,10 +34,12 @@ const getInactiveInstructors = async (req, res) => {
         }
 
         const result = await pool.query(`
-      SELECT i.*, b.name as branch_name, u.username, u.email as user_email
+      SELECT i.*, b.name as branch_name, u.username, u.email as user_email,
+             br.belt_name, br.belt_color, br.stripe_level, br.dan_level
       FROM instructors i
       JOIN branches b ON i.branch_id = b.id
       LEFT JOIN users u ON i.user_id = u.id
+      LEFT JOIN belt_ranks br ON i.belt_level_id = br.id
       WHERE i.is_active = false
       ORDER BY i.updated_at DESC, i.last_name, i.first_name
     `);

@@ -533,14 +533,14 @@ const Students = () => {
                                                     display: 'inline-block',
                                                     padding: '0.25rem 0.75rem',
                                                     borderRadius: '9999px',
-                                                    backgroundColor: getBeltColor(student.belt_level) + '20',
-                                                    color: getBeltColor(student.belt_level),
+                                                    backgroundColor: getBeltColor(student.belt_name) + '20',
+                                                    color: getBeltColor(student.belt_name),
                                                     fontSize: '0.875rem',
                                                     fontWeight: '600',
-                                                    border: `1px solid ${getBeltColor(student.belt_level)}40`
+                                                    border: `1px solid ${getBeltColor(student.belt_name)}40`
                                                 }}
                                             >
-                                                {formatBeltRank(student.belt_level)}
+                                                {formatBeltRank(student.belt_name)}
                                             </span>
                                         </td>
                                         <td>
@@ -647,7 +647,7 @@ const Students = () => {
                                         <span
                                             className="mobile-card-detail-value"
                                             style={{
-                                                color: getBeltColor(student.belt_level),
+                                                color: getBeltColor(student.belt_name),
                                                 fontWeight: '600'
                                             }}
                                         >

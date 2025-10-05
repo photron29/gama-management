@@ -490,14 +490,14 @@ const Instructors = () => {
                                                     display: 'inline-block',
                                                     padding: '0.25rem 0.75rem',
                                                     borderRadius: '9999px',
-                                                    backgroundColor: getBeltColor(instructor.belt_level) + '20',
-                                                    color: getBeltColor(instructor.belt_level),
+                                                    backgroundColor: getBeltColor(instructor.belt_name) + '20',
+                                                    color: getBeltColor(instructor.belt_name),
                                                     fontSize: '0.875rem',
                                                     fontWeight: '600',
-                                                    border: `1px solid ${getBeltColor(instructor.belt_level)}40`
+                                                    border: `1px solid ${getBeltColor(instructor.belt_name)}40`
                                                 }}
                                             >
-                                                {formatBeltRank(instructor.belt_level)}
+                                                {formatBeltRank(instructor.belt_name)}
                                             </span>
                                         </td>
                                         <td>
@@ -604,7 +604,7 @@ const Instructors = () => {
                                         <span
                                             className="mobile-card-detail-value"
                                             style={{
-                                                color: getBeltColor(instructor.belt_level),
+                                                color: getBeltColor(instructor.belt_name),
                                                 fontWeight: '600'
                                             }}
                                         >
@@ -734,13 +734,13 @@ const Instructors = () => {
                                                             padding: '0.25rem 0.75rem',
                                                             borderRadius: '9999px',
                                                             backgroundColor: getBeltColor(instructor.belt_level) + '20',
-                                                            color: getBeltColor(instructor.belt_level),
+                                                            color: getBeltColor(instructor.belt_name),
                                                             fontSize: '0.875rem',
                                                             fontWeight: '600',
                                                             border: `1px solid ${getBeltColor(instructor.belt_level)}40`
                                                         }}
                                                     >
-                                                        {formatBeltRank(instructor.belt_level)}
+                                                        {formatBeltRank(instructor.belt_name)}
                                                     </span>
                                                 </td>
                                                 <td>
