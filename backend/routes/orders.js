@@ -177,8 +177,7 @@ router.post('/', authenticateToken, async (req, res) => {
             const product = productResult.rows[0];
 
             const itemQuery = `
-                INSERT INTO order_items (order_id, product_id, product_name, category, description, price, quantity)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                INSERT INTO order_items (order_id, inventory_id, product_name, category, description, price, quantity)                VALUES ($1, $2, $3, $4, $5, $6, $7)
             `;
 
             await client.query(itemQuery, [

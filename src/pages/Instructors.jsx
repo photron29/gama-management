@@ -121,20 +121,6 @@ const Instructors = () => {
         e.preventDefault();
         setIsSubmitting(true);
 
-        // Validate required fields
-        if (!formData.first_name || !formData.last_name || !formData.username || !formData.password) {
-            toast.error('Please fill in all required fields');
-            setIsSubmitting(false);
-            return;
-        }
-
-        // Validate belt level is selected
-        if (!formData.belt_level_id || formData.belt_level_id === '') {
-            toast.error('Please select a belt level');
-            setIsSubmitting(false);
-            return;
-        }
-
         try {
             if (editingInstructor) {
                 await apiClient.updateInstructor(editingInstructor.id, formData);
@@ -151,7 +137,24 @@ const Instructors = () => {
             fetchInstructors();
         } catch (error) {
             console.error('Error saving instructor:', error);
-            toast.error(error.response?.data?.error || 'Failed to save instructor');
+
+            // More specific error handling
+            if (error.response?.data?.error) {
+                const errorMessage = error.response.data.error;
+
+                // Handle specific validation errors
+                if (errorMessage.includes('Username already exists')) {
+                    toast.error('Username is already taken. Please choose a different username.');
+                } else if (errorMessage.includes('First name, last name, username, and password are required')) {
+                    toast.error('Please fill in all required fields (First Name, Last Name, Username, and Password).');
+                } else if (errorMessage.includes('Access denied')) {
+                    toast.error('You do not have permission to perform this action.');
+                } else {
+                    toast.error(errorMessage);
+                }
+            } else {
+                toast.error('Failed to save instructor. Please try again.');
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -836,7 +839,10 @@ const Instructors = () => {
                                     value={formData.username}
                                     onChange={handleInputChange}
                                     required={!editingInstructor}
-                                    placeholder="Login username"
+                                    minLength="3"
+                                    maxLength="50"
+                                    pattern="[a-zA-Z0-9_]+"
+                                    placeholder="Login username (letters, numbers, underscore only)"
                                 />
                                 <small className="form-help">
                                     Instructor will use this to login
@@ -854,6 +860,7 @@ const Instructors = () => {
                                         required={!editingInstructor}
                                         placeholder="Login password"
                                         minLength="6"
+                                        maxLength="100"
                                     />
                                     <button
                                         type="button"
@@ -881,6 +888,9 @@ const Instructors = () => {
                                 value={formData.first_name}
                                 onChange={handleInputChange}
                                 required
+                                minLength="2"
+                                maxLength="50"
+                                placeholder="Enter first name"
                             />
                         </div>
                         <div className="form-group">
@@ -892,6 +902,9 @@ const Instructors = () => {
                                 value={formData.last_name}
                                 onChange={handleInputChange}
                                 required
+                                minLength="2"
+                                maxLength="50"
+                                placeholder="Enter last name"
                             />
                         </div>
                     </div>
@@ -905,6 +918,8 @@ const Instructors = () => {
                                 name="email"
                                 value={formData.email}
                                 onChange={handleInputChange}
+                                maxLength="100"
+                                placeholder="Enter email address"
                             />
                         </div>
                         <div className="form-group">
@@ -916,6 +931,10 @@ const Instructors = () => {
                                 value={formData.phone}
                                 onChange={handleInputChange}
                                 required
+                                pattern="[0-9]{10}"
+                                minLength="10"
+                                maxLength="10"
+                                placeholder="Enter 10-digit phone number"
                             />
                         </div>
                     </div>
@@ -1011,6 +1030,10 @@ const Instructors = () => {
                                 name="emergency_contact_phone"
                                 value={formData.emergency_contact_phone}
                                 onChange={handleInputChange}
+                                pattern="[0-9]{10}"
+                                minLength="10"
+                                maxLength="10"
+                                placeholder="Enter 10-digit phone number"
                             />
                         </div>
                     </div>
