@@ -7,10 +7,11 @@ const getAttendance = async (req, res) => {
 
         let query = `
       SELECT a.id, a.student_id, TO_CHAR(a.class_date, 'YYYY-MM-DD') as class_date, a.status, a.notes, a.marked_by, a.created_at,
-             s.first_name, s.last_name, s.belt_level, b.name as branch_name
+             s.first_name, s.last_name, br.belt_name, br.belt_color, b.name as branch_name
       FROM attendance a
       JOIN students s ON a.student_id = s.id
       JOIN branches b ON s.branch_id = b.id
+      LEFT JOIN belt_ranks br ON s.belt_level_id = br.id
       WHERE s.is_active = true
     `;
         let params = [];
@@ -61,10 +62,11 @@ const getAttendanceById = async (req, res) => {
         const { id } = req.params;
 
         let query = `
-      SELECT a.*, s.first_name, s.last_name, s.belt_level, b.name as branch_name
+      SELECT a.*, s.first_name, s.last_name, br.belt_name, br.belt_color, b.name as branch_name
       FROM attendance a
       JOIN students s ON a.student_id = s.id
       JOIN branches b ON s.branch_id = b.id
+      LEFT JOIN belt_ranks br ON s.belt_level_id = br.id
       WHERE a.id = $1
     `;
         let params = [id];

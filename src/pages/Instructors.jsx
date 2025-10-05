@@ -77,21 +77,16 @@ const Instructors = () => {
 
     const fetchInstructors = async () => {
         try {
-            console.log('🔍 Fetching instructors...');
             const [instructorsData, branchesData, inactiveData] = await Promise.all([
                 apiClient.getInstructors(),
                 apiClient.getBranches(),
                 apiClient.getInactiveInstructors()
             ]);
-            console.log('📊 Instructors data:', instructorsData);
-            console.log('📊 Branches data:', branchesData);
-            console.log('📊 Inactive data:', inactiveData);
             setInstructors(instructorsData.instructors || []);
             setBranches(branchesData);
             setInactiveInstructors(inactiveData.instructors || []);
-            console.log('✅ Instructors set:', instructorsData.instructors || []);
         } catch (error) {
-            console.error('❌ Error fetching data:', error);
+            console.error('Error fetching data:', error);
             toast.error('Failed to fetch instructors data');
         } finally {
             setLoading(false);
@@ -269,7 +264,6 @@ const Instructors = () => {
             <FaSortDown className="sort-icon" />;
     };
 
-    console.log('🔍 Current instructors state:', instructors);
     const filteredInstructors = (instructors || []).filter(instructor => {
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch = (
