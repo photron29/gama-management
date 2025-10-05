@@ -12,7 +12,7 @@ const getInstructors = async (req, res) => {
       SELECT i.*, b.name as branch_name, u.username, u.email as user_email,
              br.belt_name, br.belt_color, br.stripe_level, br.dan_level
       FROM instructors i
-      JOIN branches b ON i.branch_id = b.id
+      LEFT JOIN branches b ON i.branch_id = b.id
       LEFT JOIN users u ON i.user_id = u.id
       LEFT JOIN belt_ranks br ON i.belt_level_id = br.id
       WHERE i.is_active = true
@@ -37,7 +37,7 @@ const getInactiveInstructors = async (req, res) => {
       SELECT i.*, b.name as branch_name, u.username, u.email as user_email,
              br.belt_name, br.belt_color, br.stripe_level, br.dan_level
       FROM instructors i
-      JOIN branches b ON i.branch_id = b.id
+      LEFT JOIN branches b ON i.branch_id = b.id
       LEFT JOIN users u ON i.user_id = u.id
       LEFT JOIN belt_ranks br ON i.belt_level_id = br.id
       WHERE i.is_active = false
@@ -61,10 +61,12 @@ const getInstructorById = async (req, res) => {
         const { id } = req.params;
 
         const result = await pool.query(`
-      SELECT i.*, b.name as branch_name, u.username, u.email as user_email
+      SELECT i.*, b.name as branch_name, u.username, u.email as user_email,
+             br.belt_name, br.belt_color, br.stripe_level, br.dan_level
       FROM instructors i
-      JOIN branches b ON i.branch_id = b.id
+      LEFT JOIN branches b ON i.branch_id = b.id
       LEFT JOIN users u ON i.user_id = u.id
+      LEFT JOIN belt_ranks br ON i.belt_level_id = br.id
       WHERE i.id = $1
     `, [id]);
 
@@ -97,6 +99,7 @@ const createInstructor = async (req, res) => {
             email,
             phone,
             belt_level_id,
+            branch_id,
             specialization,
             certification_date
         } = req.body;
@@ -108,6 +111,9 @@ const createInstructor = async (req, res) => {
 
         // Convert belt_level_id to integer if provided, set default if empty
         const beltLevelId = belt_level_id && belt_level_id !== '' ? parseInt(belt_level_id) : 17; // Default to Black Belt - 1st Dan
+
+        // Convert branch_id to integer if provided, set to null if empty
+        const branchId = branch_id && branch_id !== '' ? parseInt(branch_id) : null;
 
         await client.query('BEGIN');
 
@@ -135,15 +141,15 @@ const createInstructor = async (req, res) => {
 
         const user_id = userResult.rows[0].id;
 
-        // Create instructor record (no branch assignment initially)
+        // Create instructor record
         const instructorResult = await client.query(
             `INSERT INTO instructors (
-        user_id, first_name, last_name, email, phone, belt_level_id, 
+        user_id, first_name, last_name, email, phone, belt_level_id, branch_id,
         specialization, certification_date, is_active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true) 
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true) 
       RETURNING *`,
             [
-                user_id, first_name, last_name, email, phone, beltLevelId,
+                user_id, first_name, last_name, email, phone, beltLevelId, branchId,
                 specialization, certification_date
             ]
         );

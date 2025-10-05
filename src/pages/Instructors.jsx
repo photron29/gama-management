@@ -66,6 +66,8 @@ const Instructors = () => {
         date_of_birth: '',
         belt_level_id: '',
         branch_id: '',
+        specialization: '',
+        certification_date: '',
         emergency_contact_name: '',
         emergency_contact_phone: '',
         address: ''
@@ -165,6 +167,8 @@ const Instructors = () => {
             date_of_birth: instructor.date_of_birth,
             belt_level_id: instructor.belt_level_id,
             branch_id: instructor.branch_id,
+            specialization: instructor.specialization || '',
+            certification_date: instructor.certification_date || '',
             emergency_contact_name: instructor.emergency_contact_name,
             emergency_contact_phone: instructor.emergency_contact_phone,
             address: instructor.address
@@ -248,6 +252,8 @@ const Instructors = () => {
             date_of_birth: '',
             belt_level_id: '17', // Default to Black Belt - 1st Dan
             branch_id: '',
+            specialization: '',
+            certification_date: '',
             emergency_contact_name: '',
             emergency_contact_phone: '',
             address: ''
@@ -960,6 +966,30 @@ const Instructors = () => {
                                 </option>
                             ))}
                         </select>
+                    </div>
+
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label htmlFor="specialization">Specialization</label>
+                            <input
+                                type="text"
+                                id="specialization"
+                                name="specialization"
+                                value={formData.specialization}
+                                onChange={handleInputChange}
+                                placeholder="e.g., Taekwondo, Karate, Self-Defense"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="certification_date">Certification Date</label>
+                            <input
+                                type="date"
+                                id="certification_date"
+                                name="certification_date"
+                                value={formData.certification_date}
+                                onChange={handleInputChange}
+                            />
+                        </div>
                     </div>
 
                     <div className="form-row">
