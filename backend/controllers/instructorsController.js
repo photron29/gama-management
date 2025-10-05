@@ -106,8 +106,8 @@ const createInstructor = async (req, res) => {
             return res.status(400).json({ error: 'First name, last name, username, and password are required' });
         }
 
-        // Convert belt_level_id to integer if provided
-        const beltLevelId = belt_level_id ? parseInt(belt_level_id) : null;
+        // Convert belt_level_id to integer if provided, set default if empty
+        const beltLevelId = belt_level_id && belt_level_id !== '' ? parseInt(belt_level_id) : 17; // Default to Black Belt - 1st Dan
 
         await client.query('BEGIN');
 
@@ -183,8 +183,8 @@ const updateInstructor = async (req, res) => {
             is_active
         } = req.body;
 
-        // Convert belt_level_id to integer if provided
-        const beltLevelId = belt_level_id ? parseInt(belt_level_id) : null;
+        // Convert belt_level_id to integer if provided, keep existing if empty
+        const beltLevelId = belt_level_id && belt_level_id !== '' ? parseInt(belt_level_id) : null;
 
         const result = await pool.query(
             `UPDATE instructors SET 

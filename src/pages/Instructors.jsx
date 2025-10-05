@@ -119,6 +119,20 @@ const Instructors = () => {
         e.preventDefault();
         setIsSubmitting(true);
 
+        // Validate required fields
+        if (!formData.first_name || !formData.last_name || !formData.username || !formData.password) {
+            toast.error('Please fill in all required fields');
+            setIsSubmitting(false);
+            return;
+        }
+
+        // Validate belt level is selected
+        if (!formData.belt_level_id || formData.belt_level_id === '') {
+            toast.error('Please select a belt level');
+            setIsSubmitting(false);
+            return;
+        }
+
         try {
             if (editingInstructor) {
                 await apiClient.updateInstructor(editingInstructor.id, formData);
@@ -232,7 +246,7 @@ const Instructors = () => {
             email: '',
             phone: '',
             date_of_birth: '',
-            belt_level_id: '',
+            belt_level_id: '17', // Default to Black Belt - 1st Dan
             branch_id: '',
             emergency_contact_name: '',
             emergency_contact_phone: '',
@@ -912,12 +926,13 @@ const Instructors = () => {
                             />
                         </div>
                         <div className="form-group">
-                            <label htmlFor="belt_level_id">Belt Level</label>
+                            <label htmlFor="belt_level_id">Belt Level *</label>
                             <select
                                 id="belt_level_id"
                                 name="belt_level_id"
                                 value={formData.belt_level_id}
                                 onChange={handleInputChange}
+                                required
                             >
                                 <option value="">Select Belt Level</option>
                                 {getInstructorBeltRanks().map(rank => (

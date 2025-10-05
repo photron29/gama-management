@@ -106,8 +106,8 @@ const createStudent = async (req, res) => {
             return res.status(400).json({ error: 'First name, last name, and branch are required' });
         }
 
-        // Convert belt_level_id to integer if provided
-        const beltLevelId = belt_level_id ? parseInt(belt_level_id) : null;
+        // Convert belt_level_id to integer if provided, set default if empty
+        const beltLevelId = belt_level_id && belt_level_id !== '' ? parseInt(belt_level_id) : 1; // Default to White Belt
 
         // For instructors, ensure they can only create students in their branch
         if (req.user.role === 'instructor' && branch_id !== req.user.branch_id) {
@@ -154,8 +154,8 @@ const updateStudent = async (req, res) => {
             is_active
         } = req.body;
 
-        // Convert belt_level_id to integer if provided
-        const beltLevelId = belt_level_id ? parseInt(belt_level_id) : null;
+        // Convert belt_level_id to integer if provided, keep existing if empty
+        const beltLevelId = belt_level_id && belt_level_id !== '' ? parseInt(belt_level_id) : null;
 
         // Check if student exists and user has access
         let checkQuery = 'SELECT * FROM students WHERE id = $1';
