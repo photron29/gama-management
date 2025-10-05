@@ -64,7 +64,7 @@ const Instructors = () => {
         email: '',
         phone: '',
         date_of_birth: '',
-        belt_level: '',
+        belt_level_id: '',
         branch_id: '',
         emergency_contact_name: '',
         emergency_contact_phone: '',
@@ -149,7 +149,7 @@ const Instructors = () => {
             email: instructor.email,
             phone: instructor.phone,
             date_of_birth: instructor.date_of_birth,
-            belt_level: instructor.belt_level,
+            belt_level_id: instructor.belt_level_id,
             branch_id: instructor.branch_id,
             emergency_contact_name: instructor.emergency_contact_name,
             emergency_contact_phone: instructor.emergency_contact_phone,
@@ -232,7 +232,7 @@ const Instructors = () => {
             email: '',
             phone: '',
             date_of_birth: '',
-            belt_level: '',
+            belt_level_id: '',
             branch_id: '',
             emergency_contact_name: '',
             emergency_contact_phone: '',
@@ -275,7 +275,7 @@ const Instructors = () => {
         );
 
         // Belt level filter
-        const matchesBelt = !filters.beltLevel || instructor.belt_level === filters.beltLevel;
+        const matchesBelt = !filters.beltLevel || instructor.belt_level_id === parseInt(filters.beltLevel);
 
         // Branch filter
         const matchesBranch = !filters.branch || instructor.branch_id === parseInt(filters.branch);
@@ -311,17 +311,13 @@ const Instructors = () => {
         return new Date(dateString).toLocaleDateString();
     };
 
-    const getBeltColor = (beltLevel) => {
+    const getBeltColor = (beltColor) => {
         const colors = {
             'blue': '#3b82f6',
-            'red stripe': '#ef4444',
             'red': '#dc2626',
-            'black stripe': '#1f2937',
-            'Dan 1': '#7c3aed',
-            'Dan 2': '#5b21b6',
-            'Dan 3': '#4c1d95'
+            'black': '#1f2937'
         };
-        return colors[beltLevel] || '#6b7280';
+        return colors[beltColor] || '#6b7280';
     };
 
     if (loading) {
@@ -380,7 +376,7 @@ const Instructors = () => {
                                     >
                                         <option value="">All Belts</option>
                                         {getInstructorBeltRanks().map(belt => (
-                                            <option key={belt} value={belt}>{formatBeltRank(belt)}</option>
+                                            <option key={belt.id} value={belt.id}>{belt.name}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -490,14 +486,14 @@ const Instructors = () => {
                                                     display: 'inline-block',
                                                     padding: '0.25rem 0.75rem',
                                                     borderRadius: '9999px',
-                                                    backgroundColor: getBeltColor(instructor.belt_name) + '20',
-                                                    color: getBeltColor(instructor.belt_name),
+                                                    backgroundColor: getBeltColor(instructor.belt_color) + '20',
+                                                    color: getBeltColor(instructor.belt_color),
                                                     fontSize: '0.875rem',
                                                     fontWeight: '600',
-                                                    border: `1px solid ${getBeltColor(instructor.belt_name)}40`
+                                                    border: `1px solid ${getBeltColor(instructor.belt_color)}40`
                                                 }}
                                             >
-                                                {formatBeltRank(instructor.belt_name)}
+                                                {instructor.belt_name || 'Unknown'}
                                             </span>
                                         </td>
                                         <td>
@@ -604,7 +600,7 @@ const Instructors = () => {
                                         <span
                                             className="mobile-card-detail-value"
                                             style={{
-                                                color: getBeltColor(instructor.belt_name),
+                                                color: getBeltColor(instructor.belt_color),
                                                 fontWeight: '600'
                                             }}
                                         >
@@ -733,14 +729,14 @@ const Instructors = () => {
                                                             display: 'inline-block',
                                                             padding: '0.25rem 0.75rem',
                                                             borderRadius: '9999px',
-                                                            backgroundColor: getBeltColor(instructor.belt_level) + '20',
-                                                            color: getBeltColor(instructor.belt_name),
+                                                            backgroundColor: getBeltColor(instructor.belt_color) + '20',
+                                                            color: getBeltColor(instructor.belt_color),
                                                             fontSize: '0.875rem',
                                                             fontWeight: '600',
-                                                            border: `1px solid ${getBeltColor(instructor.belt_level)}40`
+                                                            border: `1px solid ${getBeltColor(instructor.belt_color)}40`
                                                         }}
                                                     >
-                                                        {formatBeltRank(instructor.belt_name)}
+                                                        {instructor.belt_name || 'Unknown'}
                                                     </span>
                                                 </td>
                                                 <td>
@@ -916,17 +912,17 @@ const Instructors = () => {
                             />
                         </div>
                         <div className="form-group">
-                            <label htmlFor="belt_level">Belt Level</label>
+                            <label htmlFor="belt_level_id">Belt Level</label>
                             <select
-                                id="belt_level"
-                                name="belt_level"
-                                value={formData.belt_level}
+                                id="belt_level_id"
+                                name="belt_level_id"
+                                value={formData.belt_level_id}
                                 onChange={handleInputChange}
                             >
                                 <option value="">Select Belt Level</option>
                                 {getInstructorBeltRanks().map(rank => (
-                                    <option key={rank} value={rank}>
-                                        {formatBeltRank(rank)}
+                                    <option key={rank.id} value={rank.id}>
+                                        {rank.name}
                                     </option>
                                 ))}
                             </select>
@@ -1032,7 +1028,7 @@ const Instructors = () => {
                             </div>
                             <div className="form-group">
                                 <label>Belt Level</label>
-                                <p>{formatBeltRank(viewingInstructor.belt_level)}</p>
+                                <p>{viewingInstructor.belt_name || 'Unknown'}</p>
                             </div>
                         </div>
 

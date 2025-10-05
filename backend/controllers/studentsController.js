@@ -94,7 +94,7 @@ const createStudent = async (req, res) => {
             email,
             phone,
             date_of_birth,
-            belt_level,
+            belt_level_id,
             branch_id,
             emergency_contact_name,
             emergency_contact_phone,
@@ -113,12 +113,12 @@ const createStudent = async (req, res) => {
 
         const result = await pool.query(
             `INSERT INTO students (
-        first_name, last_name, email, phone, date_of_birth, belt_level, 
+        first_name, last_name, email, phone, date_of_birth, belt_level_id, 
         branch_id, emergency_contact_name, emergency_contact_phone, address
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
       RETURNING *`,
             [
-                first_name, last_name, email, phone, date_of_birth, belt_level,
+                first_name, last_name, email, phone, date_of_birth, belt_level_id,
                 branch_id, emergency_contact_name, emergency_contact_phone, address
             ]
         );
@@ -143,7 +143,7 @@ const updateStudent = async (req, res) => {
             email,
             phone,
             date_of_birth,
-            belt_level,
+            belt_level_id,
             branch_id,
             emergency_contact_name,
             emergency_contact_phone,
@@ -177,7 +177,7 @@ const updateStudent = async (req, res) => {
         email = COALESCE($3, email),
         phone = COALESCE($4, phone),
         date_of_birth = COALESCE($5, date_of_birth),
-        belt_level = COALESCE($6, belt_level),
+        belt_level_id = COALESCE($6, belt_level_id),
         branch_id = COALESCE($7, branch_id),
         emergency_contact_name = COALESCE($8, emergency_contact_name),
         emergency_contact_phone = COALESCE($9, emergency_contact_phone),
@@ -187,7 +187,7 @@ const updateStudent = async (req, res) => {
       WHERE id = $12 
       RETURNING *`,
             [
-                first_name, last_name, email, phone, date_of_birth, belt_level,
+                first_name, last_name, email, phone, date_of_birth, belt_level_id,
                 branch_id, emergency_contact_name, emergency_contact_phone, address,
                 is_active, id
             ]

@@ -377,7 +377,7 @@ const Attendance = () => {
                                         <h3>{student.first_name} {student.last_name}</h3>
                                         <p>
                                             {user?.role === 'admin' && <>{student.branch_name} • </>}
-                                            {student.belt_level}
+                                            {student.belt_name || 'Unknown'}
                                         </p>
                                     </div>
                                 </div>

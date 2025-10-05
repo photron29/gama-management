@@ -124,7 +124,7 @@ const InactiveStudents = () => {
                                 {student.address && (
                                     <p><FaMapMarkerAlt /> {student.address}</p>
                                 )}
-                                <p><strong>Belt Level:</strong> {student.belt_level}</p>
+                                <p><strong>Belt Level:</strong> {student.belt_name || 'Unknown'}</p>
                                 <p><strong>Deactivated:</strong> {new Date(student.updated_at).toLocaleDateString()}</p>
                             </div>
 

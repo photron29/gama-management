@@ -94,7 +94,7 @@ const createInstructor = async (req, res) => {
             last_name,
             email,
             phone,
-            belt_level,
+            belt_level_id,
             specialization,
             certification_date
         } = req.body;
@@ -122,10 +122,10 @@ const createInstructor = async (req, res) => {
 
         // Create user account (no branch assignment initially)
         const userResult = await client.query(
-            `INSERT INTO users (username, email, password_hash, role, first_name, last_name, phone, belt_level)
+            `INSERT INTO users (username, email, password_hash, role, first_name, last_name, phone, belt_level_id)
              VALUES ($1, $2, $3, 'instructor', $4, $5, $6, $7)
              RETURNING id`,
-            [username, email, password_hash, first_name, last_name, phone, belt_level]
+            [username, email, password_hash, first_name, last_name, phone, belt_level_id]
         );
 
         const user_id = userResult.rows[0].id;
@@ -133,12 +133,12 @@ const createInstructor = async (req, res) => {
         // Create instructor record (no branch assignment initially)
         const instructorResult = await client.query(
             `INSERT INTO instructors (
-        user_id, first_name, last_name, email, phone, belt_level, 
+        user_id, first_name, last_name, email, phone, belt_level_id, 
         specialization, certification_date, is_active
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true) 
       RETURNING *`,
             [
-                user_id, first_name, last_name, email, phone, belt_level,
+                user_id, first_name, last_name, email, phone, belt_level_id,
                 specialization, certification_date
             ]
         );
@@ -171,7 +171,7 @@ const updateInstructor = async (req, res) => {
             last_name,
             email,
             phone,
-            belt_level,
+            belt_level_id,
             branch_id,
             specialization,
             certification_date,
@@ -184,7 +184,7 @@ const updateInstructor = async (req, res) => {
         last_name = COALESCE($2, last_name),
         email = COALESCE($3, email),
         phone = COALESCE($4, phone),
-        belt_level = COALESCE($5, belt_level),
+        belt_level_id = COALESCE($5, belt_level_id),
         branch_id = COALESCE($6, branch_id),
         specialization = COALESCE($7, specialization),
         certification_date = COALESCE($8, certification_date),
@@ -193,7 +193,7 @@ const updateInstructor = async (req, res) => {
       WHERE id = $10 
       RETURNING *`,
             [
-                first_name, last_name, email, phone, belt_level,
+                first_name, last_name, email, phone, belt_level_id,
                 branch_id, specialization, certification_date, is_active, id
             ]
         );

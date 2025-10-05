@@ -930,7 +930,7 @@ const Fees = () => {
                             >
                                 <FaUser />
                                 <span>{student.first_name} {student.last_name}</span>
-                                <small>{student.belt_level}</small>
+                                <small>{student.belt_name || 'Unknown'}</small>
                             </button>
                         ))}
                     </div>
@@ -1037,7 +1037,7 @@ const Fees = () => {
                                             <h3>{student.first_name} {student.last_name}</h3>
                                             <p>
                                                 {user?.role === 'admin' && <>{student.branch_name} • </>}
-                                                {student.belt_level}
+                                                {student.belt_name || 'Unknown'}
                                             </p>
                                             {(() => {
                                                 const unpaidMonths = getUnpaidMonths(student.id);

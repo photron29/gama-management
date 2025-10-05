@@ -60,7 +60,7 @@ const Students = () => {
         email: '',
         phone: '',
         date_of_birth: '',
-        belt_level: '',
+        belt_level_id: '',
         branch_id: '',
         emergency_contact_name: '',
         emergency_contact_phone: '',
@@ -181,7 +181,7 @@ const Students = () => {
             email: student.email,
             phone: student.phone,
             date_of_birth: student.date_of_birth,
-            belt_level: student.belt_level,
+            belt_level_id: student.belt_level_id,
             branch_id: student.branch_id,
             emergency_contact_name: student.emergency_contact_name,
             emergency_contact_phone: student.emergency_contact_phone,
@@ -222,7 +222,7 @@ const Students = () => {
             email: '',
             phone: '',
             date_of_birth: '',
-            belt_level: '',
+            belt_level_id: '',
             branch_id: '',
             emergency_contact_name: '',
             emergency_contact_phone: '',
@@ -265,7 +265,7 @@ const Students = () => {
         );
 
         // Belt level filter
-        const matchesBelt = !filters.beltLevel || student.belt_level === filters.beltLevel;
+        const matchesBelt = !filters.beltLevel || student.belt_level_id === parseInt(filters.beltLevel);
 
         // Branch filter
         const matchesBranch = !filters.branch || student.branch_id === parseInt(filters.branch);
@@ -323,24 +323,17 @@ const Students = () => {
         return new Date(dateString).toLocaleDateString();
     };
 
-    const getBeltColor = (beltLevel) => {
+    const getBeltColor = (beltColor) => {
         // Theme-aware belt colors for better contrast
         const colors = {
             'white': isDarkMode ? '#e5e7eb' : '#6b7280', // Light gray for dark mode, darker gray for light mode
-            'yellow stripe': '#fbbf24',
             'yellow': '#f59e0b',
-            'green stripe': '#10b981',
             'green': '#059669',
-            'blue stripe': '#3b82f6',
             'blue': '#2563eb',
-            'red stripe': '#ef4444',
             'red': '#dc2626',
-            'black stripe': isDarkMode ? '#9ca3af' : '#1f2937', // Lighter for dark mode, darker for light mode
-            'Dan 1': '#7c3aed',
-            'Dan 2': '#5b21b6',
-            'Dan 3': '#4c1d95'
+            'black': isDarkMode ? '#9ca3af' : '#1f2937' // Lighter for dark mode, darker for light mode
         };
-        return colors[beltLevel] || '#6b7280';
+        return colors[beltColor] || '#6b7280';
     };
 
     if (loading) {
@@ -399,7 +392,7 @@ const Students = () => {
                                     >
                                         <option value="">All Belts</option>
                                         {getStudentBeltRanks().map(belt => (
-                                            <option key={belt} value={belt}>{formatBeltRank(belt)}</option>
+                                            <option key={belt.id} value={belt.id}>{belt.name}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -533,14 +526,14 @@ const Students = () => {
                                                     display: 'inline-block',
                                                     padding: '0.25rem 0.75rem',
                                                     borderRadius: '9999px',
-                                                    backgroundColor: getBeltColor(student.belt_name) + '20',
-                                                    color: getBeltColor(student.belt_name),
+                                                    backgroundColor: getBeltColor(student.belt_color) + '20',
+                                                    color: getBeltColor(student.belt_color),
                                                     fontSize: '0.875rem',
                                                     fontWeight: '600',
-                                                    border: `1px solid ${getBeltColor(student.belt_name)}40`
+                                                    border: `1px solid ${getBeltColor(student.belt_color)}40`
                                                 }}
                                             >
-                                                {formatBeltRank(student.belt_name)}
+                                                {student.belt_name || 'Unknown'}
                                             </span>
                                         </td>
                                         <td>
@@ -647,11 +640,11 @@ const Students = () => {
                                         <span
                                             className="mobile-card-detail-value"
                                             style={{
-                                                color: getBeltColor(student.belt_name),
+                                                color: getBeltColor(student.belt_color),
                                                 fontWeight: '600'
                                             }}
                                         >
-                                            {formatBeltRank(student.belt_level)}
+                                            {student.belt_name || 'Unknown'}
                                         </span>
                                     </div>
                                     <div className="mobile-card-detail">
@@ -784,17 +777,17 @@ const Students = () => {
                             />
                         </div>
                         <div className="form-group">
-                            <label htmlFor="belt_level">Belt Level</label>
+                            <label htmlFor="belt_level_id">Belt Level</label>
                             <select
-                                id="belt_level"
-                                name="belt_level"
-                                value={formData.belt_level}
+                                id="belt_level_id"
+                                name="belt_level_id"
+                                value={formData.belt_level_id}
                                 onChange={handleInputChange}
                             >
                                 <option value="">Select Belt Level</option>
                                 {getStudentBeltRanks().map(rank => (
-                                    <option key={rank} value={rank}>
-                                        {formatBeltRank(rank)}
+                                    <option key={rank.id} value={rank.id}>
+                                        {rank.name}
                                     </option>
                                 ))}
                             </select>
@@ -905,7 +898,7 @@ const Students = () => {
                             </div>
                             <div className="form-group">
                                 <label>Belt Level</label>
-                                <p>{formatBeltRank(viewingStudent.belt_level)}</p>
+                                <p>{viewingStudent.belt_name || 'Unknown'}</p>
                             </div>
                         </div>
 
