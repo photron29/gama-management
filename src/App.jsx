@@ -2,11 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import './App.css';
-import './styles/components.css';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
 import LoadingAtom from './components/LoadingAtom';
 import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
@@ -22,6 +21,11 @@ import Inventory from './pages/Inventory';
 import Products from './pages/Products';
 import MyOrders from './pages/MyOrders';
 import Orders from './pages/Orders';
+import UserProfile from './pages/UserProfile';
+import Announcements from './pages/Announcements';
+import Notifications from './pages/Notifications';
+import NotFound from './pages/NotFound';
+import ErrorPage from './pages/ErrorPage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -80,23 +84,35 @@ function AppRoutes() {
               <Inventory />
             </ProtectedRoute>
           } />
-          <Route path="/products" element={
-            <ProtectedRoute allowedRoles={['instructor']}>
-              <Products />
-            </ProtectedRoute>
-          } />
-          <Route path="/orders" element={
+          <Route path="/products" element={<Products />} />
+          <Route path="/my-orders" element={
             <ProtectedRoute allowedRoles={['instructor']}>
               <MyOrders />
             </ProtectedRoute>
           } />
-          <Route path="/admin/orders" element={
+          <Route path="/orders" element={
             <ProtectedRoute allowedRoles={['admin']}>
               <Orders />
             </ProtectedRoute>
           } />
+          <Route path="/profile" element={
+            <ProtectedRoute allowedRoles={['admin', 'instructor']}>
+              <UserProfile />
+            </ProtectedRoute>
+          } />
+          <Route path="/announcements" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Announcements />
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <Notifications />
+            </ProtectedRoute>
+          } />
           <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/404" element={<NotFound />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
     </ErrorBoundary>
@@ -107,25 +123,27 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Router>
-          <div className="App">
-            <AppRoutes />
-            <ToastContainer
-              position="top-right"
-              autoClose={5000}
-              hideProgressBar={false}
-              newestOnTop={false}
-              closeOnClick
-              rtl={false}
-              pauseOnFocusLoss
-              draggable
-              pauseOnHover
-              theme="colored"
-              toastClassName="custom-toast"
-              bodyClassName="custom-toast-body"
-            />
-          </div>
-        </Router>
+        <NotificationProvider>
+          <Router>
+            <div className="App">
+              <AppRoutes />
+              <ToastContainer
+                position="top-right"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="colored"
+                toastClassName="custom-toast"
+                bodyClassName="custom-toast-body"
+              />
+            </div>
+          </Router>
+        </NotificationProvider>
       </AuthProvider>
     </ThemeProvider>
   );

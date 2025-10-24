@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const branchesRoutes = require('./routes/branches');
 const studentsRoutes = require('./routes/students');
 const instructorsRoutes = require('./routes/instructors');
+const instructorProfileRoutes = require('./routes/instructorProfile');
 const attendanceRoutes = require('./routes/attendance');
 const attendanceApprovalsRoutes = require('./routes/attendanceApprovals');
 const productsRoutes = require('./routes/products');
@@ -17,6 +18,7 @@ const ordersRoutes = require('./routes/orders');
 const feesRoutes = require('./routes/fees');
 const dashboardRoutes = require('./routes/dashboard');
 const inventoryRoutes = require('./routes/inventory');
+const announcementsRoutes = require('./routes/announcements');
 
 // Import error handlers
 const { errorHandler, notFound } = require('./utils/errorHandler');
@@ -63,7 +65,8 @@ app.get('/', (req, res) => {
             attendance: '/api/attendance',
             fees: '/api/fees',
             dashboard: '/api/dashboard',
-            inventory: '/api/inventory'
+            inventory: '/api/inventory',
+            announcements: '/api/announcements'
         }
     });
 });
@@ -264,6 +267,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/branches', branchesRoutes);
 app.use('/api/students', studentsRoutes);
 app.use('/api/instructors', instructorsRoutes);
+app.use('/api/instructor', instructorProfileRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/attendance/approval', attendanceApprovalsRoutes);
 app.use('/api/products', productsRoutes);
@@ -271,6 +275,7 @@ app.use('/api/orders', ordersRoutes);
 app.use('/api/fees', feesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/announcements', announcementsRoutes);
 
 // 404 handler
 app.use(notFound);

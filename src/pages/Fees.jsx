@@ -14,10 +14,17 @@ import {
     FaEdit,
     FaChevronDown,
     FaChevronUp,
-    FaCheckCircle
+    FaCheckCircle,
+    FaCalendar,
+    FaFilter,
+    FaEye,
+    FaPlus,
+    FaTrash
 } from 'react-icons/fa';
 import { apiClient } from '../utils/api';
 import { getCurrentDateIST, getCurrentMonthIST, getFeeDueDate } from '../utils/dateTime';
+import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const Fees = () => {
     const { user } = useAuth();
@@ -48,9 +55,12 @@ const Fees = () => {
     const [expandedStudent, setExpandedStudent] = useState(null);
     const [editFormData, setEditFormData] = useState({
         amount: 1000,
-        payment_method: 'cash',
+        due_date: '',
         notes: ''
     });
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deletingFee, setDeletingFee] = useState(null);
 
     useEffect(() => {
         fetchData();
@@ -58,58 +68,50 @@ const Fees = () => {
 
     // Separate effect for auto-sync to avoid dependency issues
     useEffect(() => {
-        // Set up auto-sync at 10 PM IST and monthly reset on 1st
+        // Set up auto-sync at 10 PM IST
         const checkAndSync = () => {
             const istDate = new Date();
             const istOffset = 5.5 * 60;
-            const utc = istDate.getTime() + (istDate.getTimezoneOffset() * 60000);
-            const ist = new Date(utc + (istOffset * 60000));
-
-            const hour = ist.getHours();
-            const day = ist.getDate();
-            const today = getCurrentDateIST();
-
-            // If it's 10 PM IST and we haven't synced today
-            if (hour === 22 && lastSyncTime !== today) {
-                syncLocalChangesToServer();
-            }
-
-            // Monthly reset on 1st of month at 10 PM IST
-            if (day === 1 && hour === 22) {
-                resetFeesToPending();
-            }
-
-            // Auto-overdue on 10th of month at 10 PM IST
-            if (day === 10 && hour === 22) {
-                markPendingFeesAsOverdue();
+            istDate.setMinutes(istDate.getMinutes() + istOffset);
+            
+            const currentHour = istDate.getHours();
+            const currentMinute = istDate.getMinutes();
+            
+            // Check if it's 10 PM (22:00) and we haven't synced today
+            if (currentHour === 22 && currentMinute === 0) {
+                const today = istDate.toISOString().split('T')[0];
+                const lastSyncDate = lastSyncTime ? lastSyncTime.split('T')[0] : null;
+                
+                if (lastSyncDate !== today) {
+                    handleSync();
+                }
             }
         };
 
-        // Check every minute
-        const interval = setInterval(checkAndSync, 60000);
-
+        const interval = setInterval(checkAndSync, 60000); // Check every minute
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lastSyncTime]);
 
     // Refresh fees when month changes
     useEffect(() => {
-        if (!loading) {
-            fetchData();
+        if (selectedMonth) {
+            fetchFees();
         }
     }, [selectedMonth]);
 
     const fetchData = async () => {
         try {
-            setLoading(true);
-            const [feesData, studentsData, branchesData] = await Promise.all([
-                apiClient.getFees(),
-                apiClient.getStudents(),
+            // For instructors, get only students from their assigned branches
+            const params = user?.role === 'instructor' ? { instructor_id: user.id } : {};
+            
+            const [studentsData, branchesData] = await Promise.all([
+                apiClient.getStudents(params),
                 apiClient.getBranches()
             ]);
-            setFees(feesData.fees);
             setStudents(studentsData.students || []);
-            setBranches(branchesData);
+            setBranches(branchesData.branches || []);
+            await fetchFees();
         } catch (error) {
             console.error('Error fetching data:', error);
             toast.error('Failed to fetch data');
@@ -118,1059 +120,500 @@ const Fees = () => {
         }
     };
 
-    const syncLocalChangesToServer = async () => {
-        const changesToSync = Object.entries(localChanges);
-        if (changesToSync.length === 0) return;
-
+    const fetchFees = async () => {
+        if (!selectedMonth) return;
+        
         try {
-            setIsSyncing(true);
-            setSyncProgress(0);
-            console.log('Syncing local fee changes to server...');
-            console.log('Total changes to sync:', changesToSync.length);
-
-            let successCount = 0;
-            let errorCount = 0;
-            const totalChanges = changesToSync.length;
-
-            for (let i = 0; i < changesToSync.length; i++) {
-                const [key, change] = changesToSync[i];
-
-                // Update progress
-                const progress = Math.round(((i + 1) / totalChanges) * 100);
-                setSyncProgress(progress);
-                try {
-                    console.log('Syncing fee record:', {
-                        key,
-                        student_id: change.student_id,
-                        amount: change.amount,
-                        due_date: change.due_date,
-                        status: change.status
-                    });
-
-                    await apiClient.createFee({
-                        student_id: change.student_id,
-                        amount: change.amount,
-                        fee_type: 'monthly',
-                        due_date: change.due_date,
-                        status: change.status,
-                        payment_method: change.status === 'paid' ? 'cash' : null,
-                        notes: ''
-                    });
-
-                    successCount++;
-                    console.log('✓ Successfully synced fee for student:', change.student_id);
+            const feesData = await apiClient.getFees(selectedMonth);
+            setFees(feesData.fees || []);
                 } catch (error) {
-                    errorCount++;
-                    console.error('✗ Failed to sync fee for student:', change.student_id, error);
-                }
-            }
-
-            console.log(`Sync complete: ${successCount} success, ${errorCount} errors`);
-
-            // Only clear successful syncs or show appropriate message
-            if (errorCount === 0) {
-                // Clear localStorage after successful sync
-                localStorage.removeItem('fees_changes');
-                setLocalChanges({});
-
-                // Update last sync time
-                const today = getCurrentDateIST();
-                localStorage.setItem('last_fees_sync', today);
-                setLastSyncTime(today);
-
-                toast.success(`All ${successCount} fee records synced successfully`);
-            } else if (successCount > 0) {
-                toast.warning(`Partially synced: ${successCount} success, ${errorCount} failed`);
-            } else {
-                toast.error(`Failed to sync all ${errorCount} fee records`);
-            }
-
-            // Refresh from server
-            const freshData = await apiClient.getFees();
-            setFees(freshData.fees);
-        } catch (error) {
-            console.error('Error syncing fees to server:', error);
-            toast.error('Failed to sync fees. Will retry at next sync time.');
-        } finally {
-            setIsSyncing(false);
-            setSyncProgress(0);
+            console.error('Error fetching fees:', error);
+            toast.error('Failed to fetch fees');
         }
     };
 
-    const getFeeForStudent = (studentId) => {
-        const [year, month] = selectedMonth.split('-');
-
-        // Check local changes first
-        const localKey = `${studentId}_${year}-${month}`;
-        if (localChanges[localKey]) {
-            return {
-                student_id: studentId,
-                due_date: `${year}-${month}-01`,
-                status: localChanges[localKey].status,
-                amount: localChanges[localKey].amount
-            };
-        }
-
-        // Then check server data
-        const foundRecord = fees.find(record => {
-            if (record.student_id !== studentId) return false;
-
-            const feeDate = new Date(record.due_date);
-            const feeYear = feeDate.getFullYear();
-            const feeMonth = feeDate.getMonth() + 1;
-
-            return feeYear === parseInt(year) && feeMonth === parseInt(month);
-        });
-
-        return foundRecord;
-    };
-
-    const getStudentFeeHistory = (studentId) => {
-        const studentFees = [];
-        const currentDate = new Date();
-        const istOffset = 5.5 * 60;
-        const utc = currentDate.getTime() + (currentDate.getTimezoneOffset() * 60000);
-        const ist = new Date(utc + (istOffset * 60000));
-
-        // Get last 12 months (most recent first)
-        for (let i = 0; i < 12; i++) {
-            const date = new Date(ist.getFullYear(), ist.getMonth() - i, 1);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const monthKey = `${year}-${month}`;
-            const dueDate = `${year}-${month}-10`;
-
-            // Check local changes first
-            const localKey = `${studentId}_${year}-${month}`;
-            let feeRecord = null;
-
-            if (localChanges[localKey]) {
-                feeRecord = {
-                    student_id: studentId,
-                    due_date: dueDate,
-                    status: localChanges[localKey].status,
-                    amount: localChanges[localKey].amount,
-                    payment_method: localChanges[localKey].payment_method,
-                    notes: localChanges[localKey].notes
-                };
-            } else {
-                // Check server data
-                feeRecord = fees.find(record => {
-                    if (record.student_id !== studentId) return false;
-                    const feeDate = new Date(record.due_date);
-                    const feeYear = feeDate.getFullYear();
-                    const feeMonth = feeDate.getMonth() + 1;
-                    return feeYear === year && feeMonth === parseInt(month);
-                });
-            }
-
-            studentFees.push({
-                month: monthKey,
-                monthName: date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
-                dueDate: dueDate,
-                feeRecord: feeRecord,
-                isOverdue: feeRecord && feeRecord.status !== 'paid' && new Date(dueDate) < new Date()
-            });
-        }
-
-        return studentFees;
-    };
-
-    const hasUnpaidFees = (studentId) => {
-        const currentDate = new Date();
-        const istOffset = 5.5 * 60;
-        const utc = currentDate.getTime() + (currentDate.getTimezoneOffset() * 60000);
-        const ist = new Date(utc + (istOffset * 60000));
-
-        // Check last 12 months for any unpaid fees
-        for (let i = 0; i < 12; i++) {
-            const date = new Date(ist.getFullYear(), ist.getMonth() - i, 1);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const monthKey = `${year}-${month}`;
-            const dueDate = `${year}-${month}-10`;
-
-            // Check local changes first
-            const localKey = `${studentId}_${year}-${month}`;
-            let feeRecord = null;
-
-            if (localChanges[localKey]) {
-                feeRecord = {
-                    status: localChanges[localKey].status,
-                    due_date: dueDate
-                };
-            } else {
-                // Check server data
-                feeRecord = fees.find(record => {
-                    if (record.student_id !== studentId) return false;
-                    const feeDate = new Date(record.due_date);
-                    const feeYear = feeDate.getFullYear();
-                    const feeMonth = feeDate.getMonth() + 1;
-                    return feeYear === year && feeMonth === parseInt(month);
-                });
-            }
-
-            // If there's a fee record and it's not paid, and it's overdue
-            if (feeRecord && feeRecord.status !== 'paid' && new Date(dueDate) < new Date()) {
-                return true;
-            }
-        }
-
-        return false;
-    };
-
-    const resetFeesToPending = async () => {
+    const handleFeeStatusChange = async (studentId, status) => {
+        setUpdatingStudents(prev => ({ ...prev, [studentId]: true }));
+        
         try {
-            setIsSyncing(true);
-            setSyncProgress(0);
-            console.log('🔄 Monthly fee reset: Setting all fees to pending...');
-
-            // Get all active students only
-            const response = await apiClient.getStudents();
-            const activeStudents = response.filter(student => student.is_active);
-
-            console.log(`📊 Processing ${activeStudents.length} active students for monthly fee reset`);
-
-            const currentDate = new Date();
-            const istOffset = 5.5 * 60;
-            const utc = currentDate.getTime() + (currentDate.getTimezoneOffset() * 60000);
-            const ist = new Date(utc + (istOffset * 60000));
-
-            const currentYear = ist.getFullYear();
-            const currentMonth = ist.getMonth() + 1;
-            const dueDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-10`;
-
-            // Get previous month's fees to inherit amounts
-            const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-            const previousYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-
-            // Reset fees for all active students
-            const totalStudents = activeStudents.length;
-            for (let i = 0; i < activeStudents.length; i++) {
-                const student = activeStudents[i];
-
-                // Update progress
-                const progress = Math.round(((i + 1) / totalStudents) * 100);
-                setSyncProgress(progress);
-                try {
-                    // Get the student's fee amount from previous month
-                    let inheritedAmount = 1000; // Default amount
-
-                    // Look for previous month's fee record
-                    const previousFee = fees.find(fee =>
-                        fee.student_id === student.id &&
-                        fee.fee_type === 'monthly' &&
-                        new Date(fee.due_date).getFullYear() === previousYear &&
-                        new Date(fee.due_date).getMonth() + 1 === previousMonth
+            await apiClient.updateFeeStatus(studentId, selectedMonth, status);
+            
+            // Update local state
+            setFees(prev => {
+                const existing = prev.find(f => f.student_id === studentId);
+                if (existing) {
+                    return prev.map(f => 
+                        f.student_id === studentId 
+                            ? { ...f, status, updated_at: new Date().toISOString() }
+                            : f
                     );
-
-                    if (previousFee && previousFee.amount) {
-                        inheritedAmount = previousFee.amount;
-                        console.log(`📊 Inheriting amount ${inheritedAmount} for student ${student.first_name} ${student.last_name}`);
-                    }
-
-                    await apiClient.createFee({
-                        student_id: student.id,
-                        amount: inheritedAmount,
-                        fee_type: 'monthly',
-                        due_date: dueDate,
-                        status: 'pending',
-                        payment_method: null,
-                        notes: 'Monthly fee reset - inherited amount'
-                    });
-                } catch (error) {
-                    console.error(`Failed to reset fee for student ${student.id}:`, error);
+            } else {
+                    return [...prev, {
+                student_id: studentId,
+                        month: selectedMonth,
+                        status,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    }];
                 }
-            }
+            });
 
-            // Refresh data
-            await fetchData();
+            // Store change locally for offline sync
+            const changeKey = `${studentId}_${selectedMonth}`;
+            setLocalChanges(prev => ({
+                ...prev,
+                [changeKey]: { studentId, month: selectedMonth, status, timestamp: Date.now() }
+            }));
 
-            console.log('✅ Monthly fee reset completed');
-            toast.success('Monthly fees reset to pending status with inherited amounts');
-
+            toast.success(`Fee marked as ${status}`);
         } catch (error) {
-            console.error('❌ Monthly fee reset failed:', error);
-            toast.error('Failed to reset monthly fees');
+            console.error('Error updating fee status:', error);
+            toast.error('Failed to update fee status');
         } finally {
-            setIsSyncing(false);
-            setSyncProgress(0);
+            setUpdatingStudents(prev => ({ ...prev, [studentId]: false }));
         }
     };
 
-    // Mark pending fees as overdue on 10th of month
-    const markPendingFeesAsOverdue = async () => {
-        try {
+    const handleSync = async () => {
+        if (Object.keys(localChanges).length === 0) {
+            toast.info('No changes to sync');
+            return;
+        }
+
             setIsSyncing(true);
             setSyncProgress(0);
-            console.log('🔄 Auto-overdue: Marking pending fees as overdue...');
 
-            // Get all pending fees
-            const pendingFees = await apiClient.getFees();
-            const feesToUpdate = pendingFees.fees.filter(fee => fee.status === 'pending');
+        try {
+            const changes = Object.values(localChanges);
+            const totalChanges = changes.length;
+            let processedChanges = 0;
 
-            if (feesToUpdate.length === 0) {
-                console.log('✅ No pending fees to mark as overdue');
-                return;
-            }
-
-            let successCount = 0;
-            let failCount = 0;
-
-            for (let i = 0; i < feesToUpdate.length; i++) {
+            for (const change of changes) {
                 try {
-                    await apiClient.updateFee(feesToUpdate[i].id, {
-                        status: 'overdue'
-                    });
-                    successCount++;
+                    await apiClient.updateFeeStatus(
+                        change.studentId,
+                        change.month,
+                        change.status
+                    );
+                    processedChanges++;
+                    setSyncProgress((processedChanges / totalChanges) * 100);
                 } catch (error) {
-                    console.error(`Failed to mark fee ${feesToUpdate[i].id} as overdue:`, error);
-                    failCount++;
+                    console.error('Error syncing change:', error);
                 }
-
-                // Update progress
-                setSyncProgress(Math.round(((i + 1) / feesToUpdate.length) * 100));
             }
 
-            console.log(`✅ Auto-overdue completed: ${successCount} fees marked as overdue, ${failCount} failed`);
+            // Clear local changes after successful sync
+            setLocalChanges({});
+            localStorage.removeItem('fees_changes');
+            setLastSyncTime(new Date().toISOString());
+            localStorage.setItem('last_fees_sync', new Date().toISOString());
 
-            if (successCount > 0) {
-                toast.success(`${successCount} fees automatically marked as overdue`);
-            }
-            if (failCount > 0) {
-                toast.error(`${failCount} fees failed to update`);
-            }
-
+            toast.success(`Synced ${processedChanges} fee records`);
         } catch (error) {
-            console.error('Error in auto-overdue process:', error);
-            toast.error('Failed to mark fees as overdue');
+            console.error('Error during sync:', error);
+            toast.error('Failed to sync fees');
         } finally {
             setIsSyncing(false);
             setSyncProgress(0);
         }
-    };
-
-    const getUnpaidMonths = (studentId) => {
-        const unpaidMonths = [];
-        const currentDate = new Date();
-        const istOffset = 5.5 * 60;
-        const utc = currentDate.getTime() + (currentDate.getTimezoneOffset() * 60000);
-        const ist = new Date(utc + (istOffset * 60000));
-
-        // Check last 12 months
-        for (let i = 11; i >= 0; i--) {
-            const date = new Date(ist.getFullYear(), ist.getMonth() - i, 1);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const monthKey = `${year}-${month}`;
-
-            // Check local changes first
-            const localKey = `${studentId}_${year}-${month}`;
-            let feeRecord = localChanges[localKey];
-
-            if (!feeRecord) {
-                // Check server data
-                feeRecord = fees.find(record => {
-                    if (record.student_id !== studentId) return false;
-                    const feeDate = new Date(record.due_date);
-                    const feeYear = feeDate.getFullYear();
-                    const feeMonth = feeDate.getMonth() + 1;
-                    return feeYear === year && feeMonth === parseInt(month);
-                });
-            }
-
-            if (feeRecord && feeRecord.status !== 'paid') {
-                const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-                unpaidMonths.push(monthName);
-            }
-        }
-
-        return unpaidMonths;
-    };
-
-    const hasFeesInDuration = (studentId, duration) => {
-        if (!duration) return true; // No duration filter
-
-        const currentDate = new Date();
-        const istOffset = 5.5 * 60;
-        const utc = currentDate.getTime() + (currentDate.getTimezoneOffset() * 60000);
-        const ist = new Date(utc + (istOffset * 60000));
-
-        let monthsToCheck = 0;
-        switch (duration) {
-            case '1month':
-                monthsToCheck = 1;
-                break;
-            case '3months':
-                monthsToCheck = 3;
-                break;
-            case '6months':
-                monthsToCheck = 6;
-                break;
-            case '1year':
-                monthsToCheck = 12;
-                break;
-            default:
-                return true;
-        }
-
-        // Check specified number of months for any fee records
-        for (let i = 0; i < monthsToCheck; i++) {
-            const date = new Date(ist.getFullYear(), ist.getMonth() - i, 1);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const monthKey = `${year}-${month}`;
-
-            // Check local changes first
-            const localKey = `${studentId}_${year}-${month}`;
-            let hasLocalRecord = localChanges[localKey] !== undefined;
-
-            if (!hasLocalRecord) {
-                // Check server data
-                hasLocalRecord = fees.some(record => {
-                    if (record.student_id !== studentId) return false;
-                    const feeDate = new Date(record.due_date);
-                    const feeYear = feeDate.getFullYear();
-                    const feeMonth = feeDate.getMonth() + 1;
-                    return feeYear === year && feeMonth === parseInt(month);
-                });
-            }
-
-            if (hasLocalRecord) return true;
-        }
-
-        return false;
-    };
-
-    const handleFeeToggle = async (studentId, newStatus, customData = null) => {
-        setUpdatingStudents(prev => ({ ...prev, [studentId]: true }));
-
-        try {
-            const [year, month] = selectedMonth.split('-');
-            // Due date is always 10th of the month
-            const dueDate = `${year}-${month}-10`;
-            const localKey = `${studentId}_${year}-${month}`;
-
-            // Map newStatus to match database constraints: 'pending', 'paid', 'overdue'
-            // If status is not 'paid', use 'pending' instead of 'unpaid'
-            const dbStatus = newStatus === 'paid' ? 'paid' : 'pending';
-
-            // Inherit amount from previous month or use custom/default
-            let inheritedAmount = 1000; // Default amount
-
-            // Look for previous month's fee record
-            const currentMonth = parseInt(month);
-            const currentYear = parseInt(year);
-            const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-            const previousYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-
-            const previousFee = fees.find(fee =>
-                fee.student_id === studentId &&
-                fee.fee_type === 'monthly' &&
-                new Date(fee.due_date).getFullYear() === previousYear &&
-                new Date(fee.due_date).getMonth() + 1 === previousMonth
-            );
-
-            if (previousFee && previousFee.amount) {
-                inheritedAmount = previousFee.amount;
-            }
-
-            // Use custom data if provided, otherwise use inherited/defaults
-            const feeData = customData || {
-                amount: editFormData.amount || inheritedAmount,
-                payment_method: dbStatus === 'paid' ? (editFormData.payment_method || 'cash') : null,
-                notes: editFormData.notes || ''
-            };
-
-            // Save to localStorage immediately
-            const updatedChanges = {
-                ...localChanges,
-                [localKey]: {
-                    student_id: studentId,
-                    amount: feeData.amount,
-                    due_date: dueDate,
-                    status: dbStatus,
-                    payment_method: feeData.payment_method,
-                    notes: feeData.notes,
-                    timestamp: new Date().toISOString()
-                }
-            };
-
-            setLocalChanges(updatedChanges);
-            localStorage.setItem('fees_changes', JSON.stringify(updatedChanges));
-
-            // Collapse the expanded form after saving
-            if (expandedStudent === studentId) {
-                setExpandedStudent(null);
-            }
-
-            // Update UI immediately without API call
-            setUpdatingStudents(prev => ({ ...prev, [studentId]: false }));
-        } catch (error) {
-            console.error('Error updating fee:', error);
-            toast.error('Failed to update fee status');
-            setUpdatingStudents(prev => ({ ...prev, [studentId]: false }));
-        }
-    };
-
-    const toggleExpand = (studentId, feeRecord) => {
-        if (expandedStudent === studentId) {
-            setExpandedStudent(null);
-        } else {
-            setExpandedStudent(studentId);
-            // Pre-fill form with existing data if available
-            if (feeRecord) {
-                setEditFormData({
-                    amount: feeRecord.amount || 1000,
-                    payment_method: feeRecord.payment_method || 'cash',
-                    notes: feeRecord.notes || ''
-                });
-            } else {
-                setEditFormData({
-                    amount: 1000,
-                    payment_method: 'cash',
-                    notes: ''
-                });
-            }
-        }
-    };
-
-    const handleIndividualFeeToggle = async (studentId, monthKey, newStatus) => {
-        setUpdatingStudents(prev => ({ ...prev, [studentId]: true }));
-
-        try {
-            const [year, month] = monthKey.split('-');
-            const dueDate = `${year}-${month}-10`;
-            const localKey = `${studentId}_${year}-${month}`;
-
-            // Map newStatus to match database constraints
-            const dbStatus = newStatus === 'paid' ? 'paid' : 'pending';
-
-            // Inherit amount from previous month or use default
-            let inheritedAmount = 1000; // Default amount
-
-            // Look for previous month's fee record
-            const currentMonth = parseInt(month);
-            const currentYear = parseInt(year);
-            const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-            const previousYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-
-            const previousFee = fees.find(fee =>
-                fee.student_id === studentId &&
-                fee.fee_type === 'monthly' &&
-                new Date(fee.due_date).getFullYear() === previousYear &&
-                new Date(fee.due_date).getMonth() + 1 === previousMonth
-            );
-
-            if (previousFee && previousFee.amount) {
-                inheritedAmount = previousFee.amount;
-            }
-
-            // Save to localStorage immediately
-            const updatedChanges = {
-                ...localChanges,
-                [localKey]: {
-                    student_id: studentId,
-                    amount: editFormData.amount || inheritedAmount,
-                    due_date: dueDate,
-                    status: dbStatus,
-                    payment_method: dbStatus === 'paid' ? (editFormData.payment_method || 'cash') : null,
-                    notes: editFormData.notes || '',
-                    timestamp: new Date().toISOString()
-                }
-            };
-
-            setLocalChanges(updatedChanges);
-            localStorage.setItem('fees_changes', JSON.stringify(updatedChanges));
-
-            // Update UI immediately without API call
-            setUpdatingStudents(prev => ({ ...prev, [studentId]: false }));
-        } catch (error) {
-            console.error('Error updating individual fee:', error);
-            toast.error('Failed to update fee status');
-            setUpdatingStudents(prev => ({ ...prev, [studentId]: false }));
-        }
-    };
-
-    const startIndividualMode = (student) => {
-        setSelectedStudent(student);
-        setIsIndividualMode(true);
-        setIsMarkingMode(false);
-        setExpandedStudent(null);
-    };
-
-    const exitIndividualMode = () => {
-        setSelectedStudent(null);
-        setIsIndividualMode(false);
     };
 
     const handleRefresh = async () => {
         setRefreshing(true);
         try {
-            await fetchData();
-            toast.success('Data refreshed successfully');
-        } catch (error) {
-            toast.error('Failed to refresh data');
+            await fetchFees();
+            toast.success('Fees refreshed');
+                } catch (error) {
+            console.error('Error refreshing fees:', error);
+            toast.error('Failed to refresh fees');
         } finally {
             setRefreshing(false);
         }
     };
 
-    const filteredStudents = students.filter(student => {
-        // Only show active students
-        if (!student.is_active) return false;
+    const getFeeStatus = (studentId) => {
+        const record = fees.find(f => f.student_id === studentId);
+        return record ? record.status : null;
+    };
 
-        const matchesSearch = searchTerm === '' ||
-            `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
-
-        const matchesBranch = filterBranch === '' || student.branch_id === parseInt(filterBranch);
-
-        if (!matchesSearch || !matchesBranch) return false;
-
-        // Filter by duration (must have fees in specified period)
-        if (filterDuration && !hasFeesInDuration(student.id, filterDuration)) {
-            return false;
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'paid':
+                return 'bg-green-100 text-green-800 border-green-200';
+            case 'pending':
+                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            case 'overdue':
+                return 'bg-red-100 text-red-800 border-red-200';
+            default:
+                return 'bg-gray-100 text-gray-800 border-gray-200';
         }
+    };
 
-        if (filterStatus === '') return true;
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case 'paid':
+                return <FaCheckCircle className="h-4 w-4" />;
+            case 'pending':
+                return <FaExclamationTriangle className="h-4 w-4" />;
+            case 'overdue':
+                return <FaTimes className="h-4 w-4" />;
+            default:
+                return <FaExclamationTriangle className="h-4 w-4" />;
+        }
+    };
 
-        const feeRecord = getFeeForStudent(student.id);
-        const status = feeRecord ? feeRecord.status : 'pending';
-
-        return filterStatus === status;
+    const filteredStudents = students.filter(student => {
+        const matchesSearch = !searchTerm || 
+            student.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            student.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            student.email.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesStatus = !filterStatus || getFeeStatus(student.id) === filterStatus;
+        const matchesBranch = !filterBranch || student.branch_id === filterBranch;
+        
+        return matchesSearch && matchesStatus && matchesBranch;
     });
 
-    // Sort students alphabetically by last name, then first name
-    const sortedStudents = [...filteredStudents].sort((a, b) => {
-        const lastNameCompare = a.last_name.toLowerCase().localeCompare(b.last_name.toLowerCase());
-        if (lastNameCompare !== 0) return lastNameCompare;
-        return a.first_name.toLowerCase().localeCompare(b.first_name.toLowerCase());
-    });
+    const handleEditFee = (fee) => {
+                setEditFormData({
+            amount: fee.amount || 1000,
+            due_date: fee.due_date || '',
+            notes: fee.notes || ''
+        });
+        setSelectedStudent(fee);
+        setShowEditModal(true);
+    };
+
+    const handleDeleteFee = (fee) => {
+        setDeletingFee(fee);
+        setShowDeleteConfirm(true);
+    };
+
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            await apiClient.updateFee(selectedStudent.id, selectedMonth, editFormData);
+            toast.success('Fee updated successfully');
+            setShowEditModal(false);
+            fetchFees();
+        } catch (error) {
+            console.error('Error updating fee:', error);
+            toast.error('Failed to update fee');
+        }
+    };
+
+    const handleDelete = async () => {
+        try {
+            await apiClient.deleteFee(deletingFee.id);
+            toast.success('Fee deleted successfully');
+            setShowDeleteConfirm(false);
+            fetchFees();
+        } catch (error) {
+            console.error('Error deleting fee:', error);
+            toast.error('Failed to delete fee');
+        }
+    };
 
     if (loading) {
         return (
-            <div className="table-loading">
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+                <div className="text-center">
                 <LoadingAtom size="medium" />
-                <span>Loading fees...</span>
+                    <p className="mt-4 text-lg text-gray-600 font-medium">Loading fees...</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="attendance-page">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+            <div className="max-w-7xl mx-auto">
             <SyncProgressBar
                 isVisible={isSyncing}
                 progress={syncProgress}
-                message={syncProgress > 0 && syncProgress < 100 ? "Syncing Fee Records..." : "Monthly Fee Reset..."}
-            />
-            <div className="page-header">
-                <h1>Fees Management</h1>
-                <div className="header-actions">
-                    {Object.keys(localChanges).length > 0 && (
-                        <button
-                            className="btn btn-warning"
-                            onClick={syncLocalChangesToServer}
-                            disabled={isSyncing}
-                            title="Sync pending changes to server"
-                        >
-                            {isSyncing ? (
-                                <>
-                                    <LoadingAtom size="small" />
-                                    Syncing... ({Object.keys(localChanges).length})
-                                </>
-                            ) : (
-                                <>
-                                    <FaSyncAlt /> Sync Now ({Object.keys(localChanges).length})
-                                </>
-                            )}
-                        </button>
-                    )}
-                    <button
-                        className="btn btn-icon"
-                        onClick={handleRefresh}
-                        disabled={refreshing}
-                        title="Refresh data"
-                    >
-                        <FaSyncAlt className={refreshing ? 'spinning' : ''} />
-                    </button>
-                    <button
-                        className={`btn ${isMarkingMode ? 'btn-secondary' : 'btn-primary'}`}
-                        onClick={() => {
-                            setIsMarkingMode(!isMarkingMode);
-                            setIsIndividualMode(false);
-                            setSelectedStudent(null);
-                        }}
-                    >
-                        {isMarkingMode ? 'Cancel' : 'Mark Fees'}
-                    </button>
-                    <button
-                        className={`btn ${isIndividualMode ? 'btn-secondary' : 'btn-outline'}`}
-                        onClick={() => {
-                            if (isIndividualMode) {
-                                exitIndividualMode();
-                            } else {
-                                setIsIndividualMode(true);
-                                setIsMarkingMode(false);
-                            }
-                        }}
-                    >
-                        {isIndividualMode ? 'Exit Individual' : 'Mark Individual'}
-                    </button>
-                </div>
-            </div>
+                    message="Syncing Fee Records..."
+                />
 
-            {/* Controls */}
-            <div className="attendance-controls">
-                {isMarkingMode && (
-                    <div className="date-selector">
-                        <label>Month:</label>
-                        <select
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Fee Management</h1>
+                        <p className="text-gray-600 dark:text-gray-400">Track and manage student fee payments</p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <button
+                            onClick={handleRefresh}
+                            disabled={refreshing}
+                            className="bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-all duration-200 flex items-center space-x-2 shadow-md hover:shadow-lg disabled:opacity-50"
+                        >
+                            <FaSyncAlt className={refreshing ? 'animate-spin' : ''} />
+                            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+                        </button>
+                        <button
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center space-x-2 shadow-md hover:shadow-lg"
+                        >
+                            <FaPlus className="h-4 w-4" />
+                            <span>Add Fee</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Modern Controls */}
+                <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                        {/* Month Selector */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Month</label>
+                            <div className="relative">
+                                <FaCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="month"
                             value={selectedMonth}
                             onChange={(e) => setSelectedMonth(e.target.value)}
-                            className="month-selector"
-                        >
-                            {(() => {
-                                const months = [];
-                                const currentDate = new Date();
-                                const istOffset = 5.5 * 60;
-                                const utc = currentDate.getTime() + (currentDate.getTimezoneOffset() * 60000);
-                                const ist = new Date(utc + (istOffset * 60000));
-
-                                // Show last 12 months in descending order (most recent first)
-                                for (let i = 0; i < 12; i++) {
-                                    const date = new Date(ist.getFullYear(), ist.getMonth() - i, 1);
-                                    const year = date.getFullYear();
-                                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                                    const value = `${year}-${month}`;
-                                    const label = date.toLocaleDateString('en-US', {
-                                        year: 'numeric',
-                                        month: 'long'
-                                    });
-                                    months.push(
-                                        <option key={value} value={value}>
-                                            {label}
-                                        </option>
-                                    );
-                                }
-                                return months;
-                            })()}
-                        </select>
+                                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                                />
                     </div>
-                )}
+                        </div>
 
-                {!isMarkingMode && (
-                    <div className="search-box">
-                        <FaSearch />
+                        {/* Search */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Search Students</label>
+                            <div className="relative">
+                                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="Search students..."
+                                    placeholder="Search by name or email..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700 placeholder-gray-400"
                         />
                     </div>
-                )}
+                        </div>
 
-                {!isMarkingMode && (
-                    <>
-                        {user?.role === 'admin' && (
-                            <select
-                                value={filterBranch}
-                                onChange={(e) => setFilterBranch(e.target.value)}
-                                className="filter-select"
-                            >
-                                <option value="">All Branches</option>
-                                {branches.map(branch => (
-                                    <option key={branch.id} value={branch.id}>
-                                        {branch.name}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
-
+                        {/* Status Filter */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
                         <select
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
-                            className="filter-select"
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
                         >
                             <option value="">All Status</option>
                             <option value="paid">Paid</option>
                             <option value="pending">Pending</option>
                             <option value="overdue">Overdue</option>
                         </select>
+                        </div>
 
+                        {/* Branch Filter */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Branch</label>
                         <select
-                            value={filterDuration}
-                            onChange={(e) => setFilterDuration(e.target.value)}
-                            className="filter-select"
-                        >
-                            <option value="">All Duration</option>
-                            <option value="1month">Past 1 Month</option>
-                            <option value="3months">Past 3 Months</option>
-                            <option value="6months">Past 6 Months</option>
-                            <option value="1year">Past 1 Year</option>
+                                value={filterBranch}
+                                onChange={(e) => setFilterBranch(e.target.value)}
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                            >
+                                <option value="">All Branches</option>
+                                {branches.map(branch => (
+                                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                ))}
                         </select>
-                    </>
-                )}
-
             </div>
 
-            {/* Individual Mode */}
-            {isIndividualMode && (
-                <div className="individual-mode">
-                    <div className="individual-header">
-                        <h3>Individual Fee Management</h3>
-                        <p>Select a student to view and manage their fee history across multiple months</p>
-                    </div>
-                    <div className="student-selection">
-                        {sortedStudents.map((student) => (
-                            <button
-                                key={student.id}
-                                className={`student-select-btn ${selectedStudent?.id === student.id ? 'active' : ''}`}
-                                onClick={() => startIndividualMode(student)}
+                        {/* Duration Filter */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Duration</label>
+                            <select
+                                value={filterDuration}
+                                onChange={(e) => setFilterDuration(e.target.value)}
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
                             >
-                                <FaUser />
-                                <span>{student.first_name} {student.last_name}</span>
-                                <small>{student.belt_name || 'Unknown'}</small>
-                            </button>
-                        ))}
+                                <option value="">All Durations</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="quarterly">Quarterly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
                     </div>
                 </div>
-            )}
-
-            {/* Individual Student Fee History */}
-            {isIndividualMode && selectedStudent && (
-                <div className="individual-fee-history">
-                    <div className="history-header">
-                        <h4>{selectedStudent.first_name} {selectedStudent.last_name} - Fee History</h4>
-                        <button className="btn btn-sm btn-outline" onClick={exitIndividualMode}>
-                            Back to Student List
-                        </button>
-                    </div>
-                    <div className="fee-history-list">
-                        {getStudentFeeHistory(selectedStudent.id).map((fee) => (
-                            <div key={fee.month} className={`fee-history-item ${fee.isOverdue ? 'overdue' : ''}`}>
-                                <div className="fee-month-info">
-                                    <h5>{fee.monthName}</h5>
-                                    <p>Due: {fee.dueDate}</p>
-                                    {fee.isOverdue && <span className="overdue-badge">Overdue</span>}
-                                </div>
-                                <div className="fee-status-actions">
-                                    {fee.feeRecord ? (
-                                        <div className="fee-record">
-                                            <div className={`status-badge status-${fee.feeRecord.status}`}>
-                                                {fee.feeRecord.status === 'paid' ? (
-                                                    <>
-                                                        <FaCheck className="status-icon" />
-                                                        <span>Paid (₹{fee.feeRecord.amount})</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <FaTimes className="status-icon" />
-                                                        <span>Pending (₹{fee.feeRecord.amount})</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                            <div className="fee-actions">
-                                                <button
-                                                    className={`btn btn-sm ${fee.feeRecord.status === 'pending' ? 'btn-success' : 'btn-outline'}`}
-                                                    onClick={() => handleIndividualFeeToggle(selectedStudent.id, fee.month, 'pending')}
-                                                    disabled={updatingStudents[selectedStudent.id]}
-                                                >
-                                                    {fee.feeRecord.status === 'pending' ? 'Mark as Pending' : 'Set to Pending'}
-                                                </button>
-                                                <button
-                                                    className={`btn btn-sm ${fee.feeRecord.status === 'paid' ? 'btn-success' : 'btn-outline'}`}
-                                                    onClick={() => handleIndividualFeeToggle(selectedStudent.id, fee.month, 'paid')}
-                                                    disabled={updatingStudents[selectedStudent.id]}
-                                                >
-                                                    {fee.feeRecord.status === 'paid' ? 'Mark as Paid' : 'Set to Paid'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="no-fee-record">
-                                            <span className="no-record-text">No fee record</span>
-                                            <div className="fee-actions">
-                                                <button
-                                                    className="btn btn-sm btn-outline"
-                                                    onClick={() => handleIndividualFeeToggle(selectedStudent.id, fee.month, 'pending')}
-                                                    disabled={updatingStudents[selectedStudent.id]}
-                                                >
-                                                    Mark as Pending
-                                                </button>
-                                                <button
-                                                    className="btn btn-sm btn-primary"
-                                                    onClick={() => handleIndividualFeeToggle(selectedStudent.id, fee.month, 'paid')}
-                                                    disabled={updatingStudents[selectedStudent.id]}
-                                                >
-                                                    Mark as Paid
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
                 </div>
-            )}
 
-            {/* Regular Student List */}
-            {!isIndividualMode && (
-                <div className="student-attendance-list">
-                    {sortedStudents.length === 0 ? (
-                        <div className="empty-state">
-                            <FaExclamationTriangle className="empty-icon" />
-                            <p>No students found</p>
-                        </div>
+                {/* Fee Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredStudents.length === 0 ? (
+                        <div className="col-span-full flex flex-col items-center justify-center py-16">
+                            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                                <FaUser className="text-4xl text-gray-400" />
+                    </div>
+                            <h3 className="text-xl font-semibold text-gray-700 mb-2">No students found</h3>
+                            <p className="text-gray-500">Try adjusting your search or filters.</p>
+                                </div>
                     ) : (
-                        sortedStudents.map((student) => {
-                            const feeRecord = getFeeForStudent(student.id);
-                            const status = feeRecord ? feeRecord.status : 'pending';
+                        filteredStudents.map((student) => {
+                            const status = getFeeStatus(student.id);
                             const isUpdating = updatingStudents[student.id];
-
+                            
                             return (
-                                <div key={student.id} className={`student-attendance-card status-${status}`}>
-                                    <div className="student-info">
-                                        <FaUser className="student-icon" />
-                                        <div className="student-details">
-                                            <h3>{student.first_name} {student.last_name}</h3>
-                                            <p>
-                                                {user?.role === 'admin' && <>{student.branch_name} • </>}
-                                                {student.belt_name || 'Unknown'}
-                                            </p>
-                                            {(() => {
-                                                const unpaidMonths = getUnpaidMonths(student.id);
-                                                if (unpaidMonths.length > 0) {
-                                                    return (
-                                                        <p className="unpaid-months">
-                                                            <FaExclamationTriangle className="unpaid-icon" />
-                                                            Unpaid: {unpaidMonths.join(', ')}
-                                                        </p>
-                                                    );
-                                                } else {
-                                                    return (
-                                                        <p className="all-paid">
-                                                            <FaCheckCircle className="paid-icon" />
-                                                            All fees paid
-                                                        </p>
-                                                    );
-                                                }
-                                            })()}
+                                <div key={student.id} className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200">
+                                    {/* Card Header with Gradient */}
+                                    <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-6 text-white">
+                                        <div className="flex items-center space-x-4">
+                                            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                                                <span className="text-lg font-bold">
+                                                    {student.first_name[0]}{student.last_name[0]}
+                                                </span>
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="text-xl font-bold">{student.first_name} {student.last_name}</h3>
+                                                <p className="text-blue-100 text-sm">{student.email}</p>
+                                            </div>
+                                        </div>
+                                            </div>
+
+                                    {/* Card Details */}
+                                    <div className="p-6 space-y-4">
+                                        {/* Current Status */}
+                                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl">
+                                            <div className="flex items-center space-x-2">
+                                                {getStatusIcon(status)}
+                                                <span className="text-sm font-medium text-gray-600">Fee Status</span>
+                                        </div>
+                                            <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(status)}`}>
+                                                {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Not Set'}
+                                            </span>
+                                </div>
+
+                                        {/* Student Info */}
+                                        <div className="space-y-2">
+                                            <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-xl">
+                                                <span className="text-sm font-medium text-gray-600">Branch:</span>
+                                                <span className="text-sm text-gray-700">{student.branch_name}</span>
+                        </div>
+                                            <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-xl">
+                                                <span className="text-sm font-medium text-gray-600">Belt:</span>
+                                                <span className="text-sm text-gray-700">{student.belt_level}</span>
                                         </div>
                                     </div>
-
-                                    {/* Show radio-style buttons in marking mode, status with quick toggle otherwise */}
-                                    <div className="attendance-actions">
-                                        {isUpdating ? (
-                                            <div className="updating-indicator">
-                                                <LoadingAtom size="small" />
-                                                <span>Updating...</span>
                                             </div>
-                                        ) : isMarkingMode ? (
-                                            <div className="fee-marking-actions">
+
+                                    {/* Action Buttons */}
+                                    <div className="p-6 pt-0 flex space-x-2">
                                                 <button
-                                                    className="btn-icon-small"
-                                                    onClick={() => toggleExpand(student.id, feeRecord)}
-                                                    title="Edit fee details"
-                                                >
-                                                    {expandedStudent === student.id ? <FaChevronUp /> : <FaEdit />}
+                                            onClick={() => handleFeeStatusChange(student.id, 'paid')}
+                                            disabled={isUpdating}
+                                            className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-green-100 text-green-700 rounded-xl hover:bg-green-200 transition-all duration-200 font-medium disabled:opacity-50"
+                                        >
+                                            <FaCheck className="h-4 w-4" />
+                                            <span>Paid</span>
                                                 </button>
-                                                <div className="radio-toggle-group">
                                                     <button
-                                                        className={`radio-btn absent-btn ${status === 'pending' ? 'active' : ''}`}
-                                                        onClick={() => handleFeeToggle(student.id, 'pending')}
+                                            onClick={() => handleFeeStatusChange(student.id, 'pending')}
                                                         disabled={isUpdating}
+                                            className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-xl hover:bg-yellow-200 transition-all duration-200 font-medium disabled:opacity-50"
                                                     >
-                                                        <FaTimes />
+                                            <FaExclamationTriangle className="h-4 w-4" />
                                                         <span>Pending</span>
                                                     </button>
                                                     <button
-                                                        className={`radio-btn present-btn ${status === 'paid' ? 'active' : ''}`}
-                                                        onClick={() => handleFeeToggle(student.id, 'paid')}
+                                            onClick={() => handleFeeStatusChange(student.id, 'overdue')}
                                                         disabled={isUpdating}
+                                            className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-red-100 text-red-700 rounded-xl hover:bg-red-200 transition-all duration-200 font-medium disabled:opacity-50"
                                                     >
-                                                        <FaCheck />
-                                                        <span>Paid</span>
+                                            <FaTimes className="h-4 w-4" />
+                                            <span>Overdue</span>
                                                     </button>
                                                 </div>
                                             </div>
-                                        ) : (
-                                            /* Show status badge in view mode */
-                                            <div className="status-display">
-                                                {status === 'paid' && (
-                                                    <div className="status-badge status-present">
-                                                        <FaCheck className="status-icon" />
-                                                        <span className="status-text">Paid ({feeRecord?.amount || 1000})</span>
-                                                    </div>
-                                                )}
-                                                {status === 'pending' && (
-                                                    <div className="status-badge status-absent">
-                                                        <FaTimes className="status-icon" />
-                                                        <span className="status-text">Pending ({feeRecord?.amount || 1000})</span>
-                                                    </div>
-                                                )}
-                                                {status === 'overdue' && (
-                                                    <div className="status-badge status-absent" style={{ background: '#dc3545' }}>
-                                                        <FaExclamationTriangle className="status-icon" />
-                                                        <span className="status-text">Overdue ({feeRecord?.amount || 1000})</span>
-                                                    </div>
-                                                )}
-                                                {status === 'pending' && (
-                                                    <div className="status-badge status-pending">
-                                                        <FaExclamationTriangle className="status-icon" />
-                                                        <span className="status-text">Pending</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Expandable fee details form */}
-                                    {expandedStudent === student.id && isMarkingMode && (
-                                        <div className="fee-details-form">
-                                            <div className="form-row">
-                                                <div className="form-group">
-                                                    <label>Amount (₹)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={editFormData.amount}
-                                                        onChange={(e) => setEditFormData({ ...editFormData, amount: parseFloat(e.target.value) })}
-                                                        min="0"
-                                                        step="0.01"
-                                                    />
-                                                </div>
-                                                <div className="form-group">
-                                                    <label>Payment Method</label>
-                                                    <select
-                                                        value={editFormData.payment_method}
-                                                        onChange={(e) => setEditFormData({ ...editFormData, payment_method: e.target.value })}
-                                                    >
-                                                        <option value="cash">Cash</option>
-                                                        <option value="card">Credit Card</option>
-                                                        <option value="upi">UPI</option>
-                                                        <option value="bank_transfer">Bank Transfer</option>
-                                                        <option value="cheque">Cheque</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div className="form-group">
-                                                <label>Notes (optional)</label>
-                                                <textarea
-                                                    value={editFormData.notes}
-                                                    onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                                                    rows="2"
-                                                    placeholder="Add any additional notes..."
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
                             );
                         })
                     )}
-                </div>
-            )}
+                                                    </div>
+
+                {/* Sync Status */}
+                {Object.keys(localChanges).length > 0 && (
+                    <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                        <div className="flex items-center space-x-3">
+                            <FaExclamationTriangle className="h-5 w-5 text-yellow-600" />
+                            <div>
+                                <h3 className="text-sm font-semibold text-yellow-800">Pending Changes</h3>
+                                <p className="text-sm text-yellow-700">
+                                    You have {Object.keys(localChanges).length} unsynced fee changes. 
+                                    Click "Sync" to save them to the server.
+                                </p>
+                                                    </div>
+                                                    </div>
+                                            </div>
+                                        )}
+
+                {/* Edit Fee Modal */}
+                <Modal
+                    isOpen={showEditModal}
+                    onClose={() => setShowEditModal(false)}
+                    title="Edit Fee"
+                >
+                    <form onSubmit={handleEditSubmit} className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Amount</label>
+                            <div className="relative">
+                                <FaRupeeSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                                    <input
+                                                        type="number"
+                                                        value={editFormData.amount}
+                                    onChange={(e) => setEditFormData(prev => ({ ...prev, amount: e.target.value }))}
+                                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                                    required
+                                                    />
+                                                </div>
+                                                </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Due Date</label>
+                            <input
+                                type="date"
+                                value={editFormData.due_date}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, due_date: e.target.value }))}
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                            />
+                                            </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
+                                                <textarea
+                                                    value={editFormData.notes}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                                rows={3}
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                                                />
+                                            </div>
+
+                        <div className="flex justify-end space-x-4 pt-6">
+                            <button
+                                type="button"
+                                onClick={() => setShowEditModal(false)}
+                                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-200 font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 font-medium"
+                            >
+                                Update Fee
+                            </button>
+                                        </div>
+                    </form>
+                </Modal>
+
+                {/* Delete Confirmation */}
+                <ConfirmDialog
+                    isOpen={showDeleteConfirm}
+                    onClose={() => setShowDeleteConfirm(false)}
+                    onConfirm={handleDelete}
+                    title="Delete Fee"
+                    message={`Are you sure you want to delete this fee record?`}
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                />
+                                </div>
         </div>
     );
 };

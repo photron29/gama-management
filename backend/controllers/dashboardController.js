@@ -47,7 +47,7 @@ const getDashboardStats = async (req, res) => {
 
         // Show some sample data
         const sampleQuery = `
-                    SELECT a.*, s.first_name, s.last_name, s.branch_id
+                    SELECT a.*, s.name, s.branch_id
                     FROM attendance a
                     JOIN students s ON a.student_id = s.id
                     WHERE s.branch_id = $1
@@ -81,7 +81,6 @@ const getDashboardStats = async (req, res) => {
             FROM students s
             ${whereClause}
         `;
-    console.log('Students query:', studentsQuery, 'Params:', params);
     const studentsResult = await pool.query(studentsQuery, params);
 
     // Get total instructors (admin only)
@@ -105,19 +104,24 @@ const getDashboardStats = async (req, res) => {
     // Get attendance stats (last 30 days) - simplified query
     let attendanceResult = { rows: [{ total_classes: 0, present_count: 0, absent_count: 0, late_count: 0 }] };
     try {
-      const attendanceQuery = `
+      let attendanceQuery = `
                 SELECT 
                     COUNT(*) as total_classes,
-                    COUNT(CASE WHEN status = 'present' THEN 1 END) as present_count,
-                    COUNT(CASE WHEN status = 'absent' THEN 1 END) as absent_count,
-                    COUNT(CASE WHEN status = 'late' THEN 1 END) as late_count
+                    COUNT(CASE WHEN a.status = 'present' THEN 1 END) as present_count,
+                    COUNT(CASE WHEN a.status = 'absent' THEN 1 END) as absent_count,
+                    COUNT(CASE WHEN a.status = 'late' THEN 1 END) as late_count
                 FROM attendance a
                 JOIN students s ON a.student_id = s.id
                 WHERE a.class_date >= CURRENT_DATE - INTERVAL '30 days'
                 AND s.is_active = true
-                ${req.user.role === 'instructor' ? 'AND s.branch_id = $' + (paramCount + 1) : ''}
             `;
-      const attendanceParams = req.user.role === 'instructor' ? [...params, req.user.branch_id] : [];
+      let attendanceParams = [];
+      
+      if (req.user.role === 'instructor') {
+        attendanceQuery += ' AND s.branch_id = $1';
+        attendanceParams = [req.user.branch_id];
+      }
+      
       attendanceResult = await pool.query(attendanceQuery, attendanceParams);
     } catch (attendanceError) {
       console.log('Attendance query failed (table might not exist):', attendanceError.message);
@@ -126,20 +130,26 @@ const getDashboardStats = async (req, res) => {
     // Get fees stats - simplified query
     let feesResult = { rows: [{ total_fees: 0, paid_fees: 0, pending_fees: 0, overdue_fees: 0, total_collected: 0, pending_amount: 0 }] };
     try {
-      const feesQuery = `
+      let feesQuery = `
                 SELECT 
                     COUNT(*) as total_fees,
-                    COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_fees,
-                    COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_fees,
-                    COUNT(CASE WHEN status = 'overdue' THEN 1 END) as overdue_fees,
-                    COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as total_collected,
-                    COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending_amount
+                    COUNT(CASE WHEN f.status = 'paid' THEN 1 END) as paid_fees,
+                    COUNT(CASE WHEN f.status = 'pending' THEN 1 END) as pending_fees,
+                    COUNT(CASE WHEN f.status = 'overdue' THEN 1 END) as overdue_fees,
+                    COALESCE(SUM(CASE WHEN f.status = 'paid' THEN f.amount ELSE 0 END), 0) as total_collected,
+                    COALESCE(SUM(CASE WHEN f.status = 'pending' THEN f.amount ELSE 0 END), 0) as pending_amount
                 FROM fees f
                 JOIN students s ON f.student_id = s.id
                 WHERE s.is_active = true
-                ${whereClause}
             `;
-      feesResult = await pool.query(feesQuery, params);
+      let feesParams = [];
+      
+      if (req.user.role === 'instructor') {
+        feesQuery += ' AND s.branch_id = $1';
+        feesParams = [req.user.branch_id];
+      }
+      
+      feesResult = await pool.query(feesQuery, feesParams);
     } catch (feesError) {
       console.log('Fees query failed (table might not exist):', feesError.message);
     }
@@ -149,13 +159,13 @@ const getDashboardStats = async (req, res) => {
     if (req.user.role === 'admin') {
       try {
         const recentAttendanceQuery = `
-                  SELECT a.*, s.first_name, s.last_name, b.name as branch_name
+                  SELECT a.*, s.name, b.name as branch_name
                   FROM attendance a
                   JOIN students s ON a.student_id = s.id
                   JOIN branches b ON s.branch_id = b.id
                   WHERE a.class_date >= CURRENT_DATE - INTERVAL '7 days'
                   AND s.is_active = true
-                  ORDER BY a.class_date DESC, a.created_at DESC, s.first_name, s.last_name
+                  ORDER BY a.class_date DESC, a.created_at DESC, s.name
                   LIMIT 10
               `;
         console.log('Recent attendance query:', recentAttendanceQuery);
@@ -171,12 +181,12 @@ const getDashboardStats = async (req, res) => {
     if (req.user.role === 'admin') {
       try {
         const recentFeesQuery = `
-                  SELECT f.*, s.first_name, s.last_name, b.name as branch_name
+                  SELECT f.*, s.name, b.name as branch_name
                   FROM fees f
                   JOIN students s ON f.student_id = s.id
                   JOIN branches b ON s.branch_id = b.id
                   WHERE s.is_active = true
-                  ORDER BY f.created_at DESC, f.updated_at DESC, s.first_name, s.last_name
+                  ORDER BY f.created_at DESC, f.updated_at DESC, s.name
                   LIMIT 10
               `;
         console.log('Recent fees query:', recentFeesQuery);

@@ -132,102 +132,108 @@ const Products = () => {
 
     if (loading) {
         return (
-            <div className="table-loading">
+            <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
                 <LoadingAtom size="medium" />
-                <span>Loading products...</span>
+                <span className="text-gray-600">Loading products...</span>
             </div>
         );
     }
 
     return (
-        <div className="products-page">
-            <div className="page-header">
-                <h1>Products</h1>
-                <div className="header-actions">
+        <div className="p-6 max-w-7xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+                <h1 className="text-3xl font-bold text-gray-900">Products</h1>
+                <div className="flex items-center space-x-4">
                     <button
-                        className="btn btn-primary"
+                        className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 hover:shadow-lg transition-all duration-200 font-medium shadow-md"
                         onClick={() => setShowCart(!showCart)}
                     >
-                        <FaShoppingCart /> Cart ({getCartItemCount()})
+                        <FaShoppingCart className="h-4 w-4" />
+                        <span>Cart ({getCartItemCount()})</span>
                     </button>
                 </div>
             </div>
 
-            <div className="products-filters">
-                <div className="search-input">
-                    <FaSearch className="search-icon" />
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="flex-1 relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FaSearch className="h-5 w-5 text-gray-400" />
+                    </div>
                     <input
                         type="text"
                         placeholder="Search products..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                 </div>
-                <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="filter-select"
-                >
-                    <option value="">All Categories</option>
-                    {categories.map(category => (
-                        <option key={category} value={category}>{category}</option>
-                    ))}
-                </select>
+                <div className="sm:w-48">
+                    <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                        <option value="">All Categories</option>
+                        {categories.map(category => (
+                            <option key={category} value={category}>{category}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
-            <div className="products-grid">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredProducts.map(product => (
-                    <div key={product.id} className="product-card">
-                        <div className="product-image">
+                    <div key={product.id} className="bg-white border border-gray-200 rounded-xl shadow-lg hover:shadow-xl hover:border-blue-200 transition-all duration-300 overflow-hidden group hover:scale-[1.02]">
+                        <div className="aspect-square bg-gray-100 flex items-center justify-center">
                             {product.image_url ? (
-                                <img src={product.image_url} alt={product.name} />
+                                <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                             ) : (
-                                <div className="product-placeholder">
-                                    <FaBox />
+                                <div className="text-gray-400">
+                                    <FaBox className="text-4xl" />
                                 </div>
                             )}
                         </div>
 
-                        <div className="product-info">
-                            <h3>{product.name}</h3>
-                            <p className="product-description">{product.description}</p>
-                            <div className="product-meta">
-                                <span className="product-category">
-                                    <FaTag /> {product.category}
+                        <div className="p-4 space-y-3">
+                            <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{product.name}</h3>
+                            <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
+                            <div className="flex items-center justify-between text-sm text-gray-500">
+                                <span className="flex items-center gap-1">
+                                    <FaTag className="h-3 w-3" />
+                                    {product.category}
                                 </span>
-                                <span className="product-stock">
-                                    Stock: {product.stock_quantity}
-                                </span>
+                                <span>Stock: {product.stock_quantity}</span>
                             </div>
-                            <div className="product-price">
-                                ${Number(product.price).toFixed(2)}
+                            <div className="text-xl font-bold text-gray-900">
+                                ₹{Number(product.price).toFixed(2)}
                             </div>
                         </div>
 
-                        <div className="product-actions">
+                        <div className="p-4 border-t border-gray-200">
                             {cart[product.id] ? (
-                                <div className="cart-controls">
+                                <div className="flex items-center justify-center space-x-3">
                                     <button
-                                        className="btn btn-sm btn-secondary"
+                                        className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors duration-200"
                                         onClick={() => removeFromCart(product.id)}
                                     >
-                                        <FaMinus />
+                                        <FaMinus className="h-4 w-4" />
                                     </button>
-                                    <span className="quantity">{cart[product.id].quantity}</span>
+                                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-lg font-medium">{cart[product.id].quantity}</span>
                                     <button
-                                        className="btn btn-sm btn-primary"
+                                        className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
                                         onClick={() => addToCart(product.id, product.name, product.price)}
                                     >
-                                        <FaPlus />
+                                        <FaPlus className="h-4 w-4" />
                                     </button>
                                 </div>
                             ) : (
                                 <button
-                                    className="btn btn-primary"
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                                     onClick={() => addToCart(product.id, product.name, product.price)}
                                     disabled={product.stock_quantity === 0}
                                 >
-                                    <FaShoppingCart /> Add to Cart
+                                    <FaShoppingCart className="h-4 w-4" />
+                                    <span>Add to Cart</span>
                                 </button>
                             )}
                         </div>
@@ -236,86 +242,93 @@ const Products = () => {
             </div>
 
             {showCart && (
-                <div className="cart-overlay" onClick={() => setShowCart(false)}>
-                    <div className="cart-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="cart-header">
-                            <h2 className="cart-title">
-                                <FaShoppingCart /> Shopping Cart
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={() => setShowCart(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl max-h-[90vh] w-full max-w-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50 rounded-t-xl">
+                            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                <FaShoppingCart className="h-6 w-6" />
+                                Shopping Cart
                             </h2>
                             <button
-                                className="cart-close"
+                                className="text-gray-400 hover:text-gray-600 text-2xl font-bold p-2 hover:bg-gray-100 rounded-lg transition-colors"
                                 onClick={() => setShowCart(false)}
                             >
                                 ×
                             </button>
                         </div>
 
-                        <div className="cart-items">
+                        <div className="p-6">
                             {Object.values(cart).length === 0 ? (
-                                <div className="empty-cart">
-                                    <div className="empty-cart-icon">🛒</div>
-                                    <h3>Your cart is empty</h3>
-                                    <p>Add some products to get started</p>
+                                <div className="text-center py-16">
+                                    <div className="text-6xl mb-4">🛒</div>
+                                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Your cart is empty</h3>
+                                    <p className="text-gray-500">Add some products to get started</p>
                                 </div>
                             ) : (
-                                Object.values(cart).map(item => (
-                                    <div key={item.id} className="cart-item">
-                                        <div className="item-info">
-                                            <h4>{item.name}</h4>
-                                            <p>${Number(item.price).toFixed(2)} each</p>
-                                        </div>
-                                        <div className="item-controls">
-                                            <button
-                                                onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
-                                                disabled={item.quantity <= 1}
-                                            >
-                                                <FaMinus />
-                                            </button>
-                                            <span className="item-quantity">{item.quantity}</span>
-                                            <button
-                                                onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
-                                            >
-                                                <FaPlus />
-                                            </button>
-                                        </div>
-                                        <div className="item-right">
-                                            <div className="item-total">
-                                                ${(Number(item.price) * item.quantity).toFixed(2)}
+                                <div className="space-y-4">
+                                    {Object.values(cart).map(item => (
+                                        <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-gray-900">{item.name}</h4>
+                                                <p className="text-sm text-gray-600">₹{Number(item.price).toFixed(2)} each</p>
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <button
+                                                    className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors duration-200 disabled:opacity-50"
+                                                    onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                                                    disabled={item.quantity <= 1}
+                                                >
+                                                    <FaMinus className="h-4 w-4" />
+                                                </button>
+                                                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-lg font-medium">{item.quantity}</span>
+                                                <button
+                                                    className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+                                                    onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                                                >
+                                                    <FaPlus className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                            <div className="ml-4">
+                                                <div className="text-lg font-semibold text-gray-900">
+                                                    ₹{(Number(item.price) * item.quantity).toFixed(2)}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))
+                                    ))}
+                                </div>
                             )}
                         </div>
 
                         {Object.values(cart).length > 0 && (
-                            <div className="cart-footer">
-                                <div className="cart-notes">
-                                    <label>Order Notes (Optional)</label>
+                            <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Order Notes (Optional)</label>
                                     <textarea
                                         value={orderNotes}
                                         onChange={(e) => setOrderNotes(e.target.value)}
                                         placeholder="Any special instructions for this order..."
                                         rows="3"
+                                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>
 
-                                <div className="cart-total">
-                                    <h3>Total: ${Number(getCartTotal()).toFixed(2)}</h3>
+                                <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200">
+                                    <h3 className="text-xl font-bold text-gray-900">Total: ₹{Number(getCartTotal()).toFixed(2)}</h3>
                                 </div>
 
-                                <div className="cart-actions">
+                                <div className="flex gap-4">
                                     <button
-                                        className="btn btn-secondary"
+                                        className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200"
                                         onClick={() => setShowCart(false)}
                                     >
                                         Continue Shopping
                                     </button>
                                     <button
-                                        className="btn btn-primary"
+                                        className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
                                         onClick={handlePlaceOrder}
                                     >
-                                        <FaShoppingBag /> Place Order
+                                        <FaShoppingBag className="h-4 w-4" />
+                                        <span>Place Order</span>
                                     </button>
                                 </div>
                             </div>

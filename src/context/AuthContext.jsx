@@ -46,7 +46,7 @@ const authReducer = (state, action) => {
 export const AuthProvider = ({ children }) => {
     const [state, dispatch] = useReducer(authReducer, initialState);
 
-    // Check for existing token on app load
+    // Check for existing token on app load and fetch complete user data
     useEffect(() => {
         const token = localStorage.getItem('token');
         const user = localStorage.getItem('user');
@@ -58,10 +58,29 @@ export const AuthProvider = ({ children }) => {
                     type: 'LOGIN_SUCCESS',
                     payload: { token, user: parsedUser }
                 });
+                
+                // Fetch complete user profile from server
+                const fetchCompleteProfile = async () => {
+                    try {
+                        const response = await apiClient.getProfile();
+                        const completeUser = response.user;
+                        localStorage.setItem('user', JSON.stringify(completeUser));
+                        dispatch({
+                            type: 'UPDATE_USER',
+                            payload: completeUser
+                        });
+                    } catch (error) {
+                        console.error('Error fetching complete profile:', error);
+                        // If profile fetch fails, continue with stored user data
+                    }
+                };
+                
+                fetchCompleteProfile();
             } catch (error) {
                 console.error('Error parsing stored user data:', error);
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
+                dispatch({ type: 'SET_LOADING', payload: false });
             }
         } else {
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -90,7 +109,7 @@ export const AuthProvider = ({ children }) => {
         dispatch({ type: 'LOGOUT' });
     };
 
-    const updateUser = (userData) => {
+    const setUser = (userData) => {
         const updatedUser = { ...state.user, ...userData };
         localStorage.setItem('user', JSON.stringify(updatedUser));
         dispatch({
@@ -103,7 +122,7 @@ export const AuthProvider = ({ children }) => {
         ...state,
         login,
         logout,
-        updateUser
+        setUser
     };
 
     return (

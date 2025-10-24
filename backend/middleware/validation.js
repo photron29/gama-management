@@ -243,11 +243,11 @@ const validateInventory = [
         .isLength({ min: 2, max: 100 })
         .withMessage('Item name must be between 2 and 100 characters'),
 
-    body('category')
+    body('supplier')
         .notEmpty()
-        .withMessage('Category is required')
+        .withMessage('Supplier is required')
         .isLength({ min: 2, max: 50 })
-        .withMessage('Category must be between 2 and 50 characters'),
+        .withMessage('Supplier must be between 2 and 50 characters'),
 
     body('quantity')
         .notEmpty()
@@ -255,11 +255,11 @@ const validateInventory = [
         .isInt({ min: 0 })
         .withMessage('Quantity must be a non-negative integer'),
 
-    body('unit_price')
+    body('price')
         .notEmpty()
-        .withMessage('Unit price is required')
+        .withMessage('Price is required')
         .isFloat({ min: 0 })
-        .withMessage('Unit price must be a positive number'),
+        .withMessage('Price must be a positive number'),
 
     body('branch_id')
         .notEmpty()

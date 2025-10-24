@@ -15,7 +15,7 @@ const getBranches = async (req, res) => {
       ORDER BY b.name
     `);
 
-        res.json(result.rows);
+        res.json({ branches: result.rows });
     } catch (error) {
         console.error('Error fetching branches:', error);
         res.status(500).json({ error: 'Failed to fetch branches' });

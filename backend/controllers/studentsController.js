@@ -6,10 +6,10 @@ const getStudents = async (req, res) => {
         const { include_inactive } = req.query;
 
         let query = `
-      SELECT s.*, b.name as branch_name, br.belt_name, br.belt_color, br.stripe_level, br.dan_level
+      SELECT s.*, b.name as branch_name, br.name as belt_name, br.color as belt_color
       FROM students s 
       JOIN branches b ON s.branch_id = b.id
-      LEFT JOIN belt_ranks br ON s.belt_level_id = br.id
+      LEFT JOIN belt_ranks br ON s.belt_id = br.id /* ✅ FIX: Changed s.belt_rank_id to s.belt_id */
       WHERE s.is_active = true
     `;
         let params = [];
@@ -20,8 +20,14 @@ const getStudents = async (req, res) => {
             query += ` AND s.branch_id = $${++paramCount}`;
             params.push(req.user.branch_id);
         }
+        
+        // Include inactive students only if the admin requests it (and if not already filtered by the WHERE clause)
+        if (req.user.role === 'admin' && include_inactive === 'true') {
+            query = query.replace('WHERE s.is_active = true', 'WHERE 1=1'); // Remove the default active filter
+        }
 
-        query += ` ORDER BY s.last_name, s.first_name`;
+
+        query += ` ORDER BY s.name`;
 
         const result = await pool.query(query, params);
         res.json({ students: result.rows });
@@ -39,11 +45,12 @@ const getInactiveStudents = async (req, res) => {
         }
 
         const result = await pool.query(`
-      SELECT s.*, b.name as branch_name 
+      SELECT s.*, b.name as branch_name, br.name as belt_name, br.color as belt_color /* ✅ FIX: Added belt info */
       FROM students s 
       JOIN branches b ON s.branch_id = b.id
+      LEFT JOIN belt_ranks br ON s.belt_id = br.id /* ✅ FIX: Added join on s.belt_id */
       WHERE s.is_active = false
-      ORDER BY s.updated_at DESC, s.last_name, s.first_name
+      ORDER BY s.updated_at DESC, s.name
     `);
 
         res.json({ students: result.rows });
@@ -59,9 +66,10 @@ const getStudentById = async (req, res) => {
         const { id } = req.params;
 
         let query = `
-      SELECT s.*, b.name as branch_name 
+      SELECT s.*, b.name as branch_name, br.name as belt_name, br.color as belt_color /* ✅ FIX: Added belt info */
       FROM students s 
       JOIN branches b ON s.branch_id = b.id 
+      LEFT JOIN belt_ranks br ON s.belt_id = br.id /* ✅ FIX: Added join on s.belt_id */
       WHERE s.id = $1
     `;
         let params = [id];
@@ -89,25 +97,36 @@ const getStudentById = async (req, res) => {
 const createStudent = async (req, res) => {
     try {
         const {
-            first_name,
-            last_name,
-            email,
-            phone,
+            name,
+            gender,
             date_of_birth,
-            belt_level_id,
+            age,
+            contact_number,
+            email,
+            aadhar_card_number,
+            address,
+            father_contact_number,
+            father_name,
+            father_occupation,
+            mother_name,
+            mother_contact_number,
+            mother_occupation,
+            whatsapp_number,
+            fee_payment_preference,
+            belt_rank_id, // Keep for request body destructuring
             branch_id,
-            emergency_contact_name,
-            emergency_contact_phone,
-            address
+            notes
         } = req.body;
 
         // Validate required fields
-        if (!first_name || !last_name || !branch_id) {
-            return res.status(400).json({ error: 'First name, last name, and branch are required' });
+        if (!name || !gender || !date_of_birth || !age || !contact_number || !whatsapp_number || !fee_payment_preference || !branch_id) {
+            return res.status(400).json({ 
+                error: 'Name, gender, date of birth, age, contact number, WhatsApp number, fee payment preference, and branch are required' 
+            });
         }
 
-        // Convert belt_level_id to integer if provided, set default if empty
-        const beltLevelId = belt_level_id && belt_level_id !== '' ? parseInt(belt_level_id) : 1; // Default to White Belt
+        // Convert belt_rank_id from body to beltId for DB, set default if empty
+        const beltId = belt_rank_id && belt_rank_id !== '' ? parseInt(belt_rank_id) : 1; // Default to White Belt (ID 1)
 
         // For instructors, ensure they can only create students in their branch
         if (req.user.role === 'instructor' && branch_id !== req.user.branch_id) {
@@ -116,13 +135,17 @@ const createStudent = async (req, res) => {
 
         const result = await pool.query(
             `INSERT INTO students (
-        first_name, last_name, email, phone, date_of_birth, belt_level_id, 
-        branch_id, emergency_contact_name, emergency_contact_phone, address
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+        name, gender, date_of_birth, age, contact_number, email, aadhar_card_number, 
+        address, father_contact_number, father_name, father_occupation, 
+        mother_name, mother_contact_number, mother_occupation, whatsapp_number, 
+        fee_payment_preference, belt_id, branch_id, notes /* ✅ FIX: Changed belt_rank_id to belt_id */
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
       RETURNING *`,
             [
-                first_name, last_name, email, phone, date_of_birth, beltLevelId,
-                branch_id, emergency_contact_name, emergency_contact_phone, address
+                name, gender, date_of_birth, age, contact_number, email, aadhar_card_number,
+                address, father_contact_number, father_name, father_occupation,
+                mother_name, mother_contact_number, mother_occupation, whatsapp_number,
+                fee_payment_preference, beltId, branch_id, notes /* ✅ FIX: Used beltId variable */
             ]
         );
 
@@ -141,21 +164,30 @@ const updateStudent = async (req, res) => {
     try {
         const { id } = req.params;
         const {
-            first_name,
-            last_name,
-            email,
-            phone,
+            name,
+            gender,
             date_of_birth,
-            belt_level_id,
-            branch_id,
-            emergency_contact_name,
-            emergency_contact_phone,
+            age,
+            contact_number,
+            email,
+            aadhar_card_number,
             address,
+            father_contact_number,
+            father_name,
+            father_occupation,
+            mother_name,
+            mother_contact_number,
+            mother_occupation,
+            whatsapp_number,
+            fee_payment_preference,
+            belt_rank_id, // Keep for request body destructuring
+            branch_id,
+            notes,
             is_active
         } = req.body;
 
-        // Convert belt_level_id to integer if provided, keep existing if empty
-        const beltLevelId = belt_level_id && belt_level_id !== '' ? parseInt(belt_level_id) : null;
+        // Convert belt_rank_id from body to beltId for DB
+        const beltId = belt_rank_id && belt_rank_id !== '' ? parseInt(belt_rank_id) : null;
 
         // Check if student exists and user has access
         let checkQuery = 'SELECT * FROM students WHERE id = $1';
@@ -178,24 +210,34 @@ const updateStudent = async (req, res) => {
 
         const result = await pool.query(
             `UPDATE students SET 
-        first_name = COALESCE($1, first_name),
-        last_name = COALESCE($2, last_name),
-        email = COALESCE($3, email),
-        phone = COALESCE($4, phone),
-        date_of_birth = COALESCE($5, date_of_birth),
-        belt_level_id = COALESCE($6, belt_level_id),
-        branch_id = COALESCE($7, branch_id),
-        emergency_contact_name = COALESCE($8, emergency_contact_name),
-        emergency_contact_phone = COALESCE($9, emergency_contact_phone),
-        address = COALESCE($10, address),
-        is_active = COALESCE($11, is_active),
+        name = COALESCE($1, name),
+        gender = COALESCE($2, gender),
+        date_of_birth = COALESCE($3, date_of_birth),
+        age = COALESCE($4, age),
+        contact_number = COALESCE($5, contact_number),
+        email = COALESCE($6, email),
+        aadhar_card_number = COALESCE($7, aadhar_card_number),
+        address = COALESCE($8, address),
+        father_contact_number = COALESCE($9, father_contact_number),
+        father_name = COALESCE($10, father_name),
+        father_occupation = COALESCE($11, father_occupation),
+        mother_name = COALESCE($12, mother_name),
+        mother_contact_number = COALESCE($13, mother_contact_number),
+        mother_occupation = COALESCE($14, mother_occupation),
+        whatsapp_number = COALESCE($15, whatsapp_number),
+        fee_payment_preference = COALESCE($16, fee_payment_preference),
+        belt_id = COALESCE($17, belt_id), /* ✅ FIX: Changed belt_rank_id to belt_id */
+        branch_id = COALESCE($18, branch_id),
+        notes = COALESCE($19, notes),
+        is_active = COALESCE($20, is_active),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $12 
+      WHERE id = $21 
       RETURNING *`,
             [
-                first_name, last_name, email, phone, date_of_birth, beltLevelId,
-                branch_id, emergency_contact_name, emergency_contact_phone, address,
-                is_active, id
+                name, gender, date_of_birth, age, contact_number, email, aadhar_card_number,
+                address, father_contact_number, father_name, father_occupation,
+                mother_name, mother_contact_number, mother_occupation, whatsapp_number,
+                fee_payment_preference, beltId, branch_id, notes, is_active, id /* ✅ FIX: Used beltId variable */
             ]
         );
 

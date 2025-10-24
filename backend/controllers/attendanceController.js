@@ -6,12 +6,12 @@ const getAttendance = async (req, res) => {
         const { student_id, start_date, end_date, branch_id } = req.query;
 
         let query = `
-      SELECT a.id, a.student_id, TO_CHAR(a.class_date, 'YYYY-MM-DD') as class_date, a.status, a.notes, a.marked_by, a.created_at,
-             s.first_name, s.last_name, br.belt_name, br.belt_color, b.name as branch_name
+      SELECT a.id, a.student_id, TO_CHAR(a.class_date, 'YYYY-MM-DD') as class_date, a.status, a.marked_by, a.created_at, a.updated_at,
+            s.name, br.name as belt_name, br.color as belt_color, b.name as branch_name
       FROM attendance a
       JOIN students s ON a.student_id = s.id
       JOIN branches b ON s.branch_id = b.id
-      LEFT JOIN belt_ranks br ON s.belt_level_id = br.id
+      LEFT JOIN belt_ranks br ON s.belt_id = br.id
       WHERE s.is_active = true
     `;
         let params = [];
@@ -46,7 +46,7 @@ const getAttendance = async (req, res) => {
             params.push(branch_id);
         }
 
-        query += ` ORDER BY a.class_date DESC, s.last_name, s.first_name`;
+        query += ` ORDER BY a.class_date DESC, s.name`;
 
         const result = await pool.query(query, params);
         res.json({ attendance: result.rows });
@@ -62,11 +62,12 @@ const getAttendanceById = async (req, res) => {
         const { id } = req.params;
 
         let query = `
-      SELECT a.*, s.first_name, s.last_name, br.belt_name, br.belt_color, b.name as branch_name
+      SELECT a.id, a.student_id, TO_CHAR(a.class_date, 'YYYY-MM-DD') as class_date, a.status, a.marked_by, a.created_at, a.updated_at,
+             s.name, br.name as belt_name, br.color as belt_color, b.name as branch_name
       FROM attendance a
       JOIN students s ON a.student_id = s.id
       JOIN branches b ON s.branch_id = b.id
-      LEFT JOIN belt_ranks br ON s.belt_level_id = br.id
+      LEFT JOIN belt_ranks br ON s.belt_id = br.id
       WHERE a.id = $1
     `;
         let params = [id];
@@ -93,10 +94,12 @@ const getAttendanceById = async (req, res) => {
 // Create attendance record
 const createAttendance = async (req, res) => {
     try {
-        const { student_id, class_date, status, notes } = req.body;
+        // Removed 'notes' from destructuring
+        const { student_id, class_date, status } = req.body; 
 
         console.log('=== CREATE/UPDATE ATTENDANCE ===');
-        console.log('Received data:', { student_id, class_date, status, notes });
+        // Removed 'notes' from console log
+        console.log('Received data:', { student_id, class_date, status });
         console.log('Date type:', typeof class_date);
 
         // Validate required fields
@@ -132,25 +135,24 @@ const createAttendance = async (req, res) => {
         let result;
         if (existingRecord.rows.length > 0) {
             console.log('Updating existing record...');
-            // Update existing record instead of throwing error
+            // Update existing record 
             result = await pool.query(
                 `UPDATE attendance SET 
                     status = $1,
-                    notes = $2,
-                    marked_by = $3
-                WHERE student_id = $4 AND class_date::date = $5::date
-                RETURNING id, student_id, TO_CHAR(class_date, 'YYYY-MM-DD') as class_date, status, notes, marked_by, created_at`,
-                [status, notes, req.user.id, student_id, class_date]
+                    marked_by = $2
+                WHERE student_id = $3 AND class_date::date = $4::date
+                RETURNING id, student_id, TO_CHAR(class_date, 'YYYY-MM-DD') as class_date, status, marked_by, created_at`,
+                [status, req.user.id, student_id, class_date]
             );
             console.log('Updated record:', result.rows[0]);
         } else {
             console.log('Creating new record...');
             // Create new record - cast directly to DATE to avoid timezone conversion
             result = await pool.query(
-                `INSERT INTO attendance (student_id, class_date, status, notes, marked_by) 
-           VALUES ($1, $2::date, $3, $4, $5) 
-           RETURNING id, student_id, TO_CHAR(class_date, 'YYYY-MM-DD') as class_date, status, notes, marked_by, created_at`,
-                [student_id, class_date, status, notes, req.user.id]
+                `INSERT INTO attendance (student_id, class_date, status, marked_by) 
+            VALUES ($1, $2::date, $3, $4) 
+            RETURNING id, student_id, TO_CHAR(class_date, 'YYYY-MM-DD') as class_date, status, marked_by, created_at`,
+                [student_id, class_date, status, req.user.id]
             );
             console.log('Created record:', result.rows[0]);
         }
@@ -171,7 +173,8 @@ const createAttendance = async (req, res) => {
 const updateAttendance = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, notes } = req.body;
+        // Removed 'notes' from destructuring
+        const { status } = req.body; 
 
         // Check if attendance record exists and user has access
         let checkQuery = `
@@ -200,10 +203,10 @@ const updateAttendance = async (req, res) => {
         const result = await pool.query(
             `UPDATE attendance SET 
         status = COALESCE($1, status),
-        notes = COALESCE($2, notes)
-      WHERE id = $3 
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2 
       RETURNING *`,
-            [status, notes, id]
+            [status, id]
         );
 
         res.json({

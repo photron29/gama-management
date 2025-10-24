@@ -1,34 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { FaPlus, FaEdit, FaTrash, FaMapMarkerAlt, FaSearch, FaEye, FaPhone, FaEnvelope, FaUser, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
-import { toast } from 'react-toastify';
-import LoadingAtom from '../components/LoadingAtom';
+import { FaPlus, FaSearch, FaFilter, FaEye, FaEdit, FaTrash, FaMapMarkerAlt, FaPhone, FaEnvelope, FaUser } from 'react-icons/fa';
 import { apiClient } from '../utils/api';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 const Branches = () => {
     const [branches, setBranches] = useState([]);
-    const [instructors, setInstructors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortField, setSortField] = useState('name');
-    const [sortDirection, setSortDirection] = useState('asc');
-
-    // Modal states
-    const [showModal, setShowModal] = useState(false);
-    const [showViewModal, setShowViewModal] = useState(false);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [editingBranch, setEditingBranch] = useState(null);
     const [viewingBranch, setViewingBranch] = useState(null);
-    const [deletingBranch, setDeletingBranch] = useState(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
+    const [deletingBranchId, setDeletingBranchId] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         address: '',
         phone: '',
         email: '',
-        manager_id: ''
+        manager: ''
     });
 
     useEffect(() => {
@@ -37,564 +28,397 @@ const Branches = () => {
 
     const fetchBranches = async () => {
         try {
-            setLoading(true);
-            const [branchesData, instructorsData] = await Promise.all([
-                apiClient.getBranches(),
-                apiClient.getInstructors()
-            ]);
-            setBranches(branchesData || []);
-            setInstructors(instructorsData.instructors || []);
+            const response = await apiClient.getBranches();
+            setBranches(response.branches || []);
         } catch (error) {
             console.error('Error fetching branches:', error);
-            toast.error('Failed to fetch branches');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-
-        try {
-            if (editingBranch) {
-                await apiClient.updateBranch(editingBranch.id, formData);
-                toast.success('Branch updated successfully');
-            } else {
-                await apiClient.createBranch(formData);
-                toast.success('Branch added successfully');
-            }
-
-            setShowModal(false);
-            setEditingBranch(null);
-            resetForm();
-            fetchBranches();
-        } catch (error) {
-            console.error('Error saving branch:', error);
-            toast.error(error.response?.data?.error || 'Failed to save branch');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleEdit = (branch) => {
-        setEditingBranch(branch);
-        setFormData({
-            name: branch.name,
-            address: branch.address,
-            phone: branch.phone,
-            email: branch.email,
-            manager_id: branch.manager_id || ''
-        });
-        setShowModal(true);
-    };
-
-    const handleView = (branch) => {
-        setViewingBranch(branch);
-        setShowViewModal(true);
-    };
-
-    const handleDelete = (branch) => {
-        setDeletingBranch(branch);
-        setShowDeleteConfirm(true);
-    };
-
-    const confirmDelete = async () => {
-        if (!deletingBranch) return;
-
-        try {
-            await apiClient.deleteBranch(deletingBranch.id);
-            toast.success('Branch deleted successfully');
-            setShowDeleteConfirm(false);
-            setDeletingBranch(null);
-            fetchBranches();
-        } catch (error) {
-            console.error('Error deleting branch:', error);
-            toast.error(error.response?.data?.error || 'Failed to delete branch');
-        }
-    };
-
-    const resetForm = () => {
+    const handleNewBranch = () => {
+        setEditingBranch(null);
         setFormData({
             name: '',
             address: '',
             phone: '',
             email: '',
-            manager_id: ''
+            manager: ''
         });
+        setIsModalOpen(true);
     };
 
-    const handleNewBranch = () => {
-        setEditingBranch(null);
-        resetForm();
-        setShowModal(true);
+    const handleEditBranch = (branch) => {
+        setEditingBranch(branch);
+        setFormData({
+            name: branch.name || '',
+            address: branch.address || '',
+            phone: branch.phone || '',
+            email: branch.email || '',
+            manager: branch.manager || ''
+        });
+        setIsModalOpen(true);
     };
 
-    const handleSort = (field) => {
-        if (sortField === field) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortField(field);
-            setSortDirection('asc');
+    const handleViewBranch = (branch) => {
+        setViewingBranch(branch);
+        setIsViewModalOpen(true);
+    };
+
+    const handleDeleteBranch = (branchId) => {
+        setDeletingBranchId(branchId);
+        setIsDeleteDialogOpen(true);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            if (editingBranch) {
+                await apiClient.updateBranch(editingBranch.id, formData);
+            } else {
+                await apiClient.createBranch(formData);
+            }
+            setIsModalOpen(false);
+            fetchBranches();
+        } catch (error) {
+            console.error('Error saving branch:', error);
         }
     };
 
-    const getSortIcon = (field) => {
-        if (sortField !== field) {
-            return <FaSort className="sort-icon" />;
+    const handleDelete = async () => {
+        try {
+            await apiClient.deleteBranch(deletingBranchId);
+            setIsDeleteDialogOpen(false);
+            fetchBranches();
+        } catch (error) {
+            console.error('Error deleting branch:', error);
         }
-        return sortDirection === 'asc' ?
-            <FaSortUp className="sort-icon" /> :
-            <FaSortDown className="sort-icon" />;
     };
 
-    const filteredBranches = (branches || []).filter(branch => {
-        const searchLower = searchTerm.toLowerCase();
-        return (
-            branch.name.toLowerCase().includes(searchLower) ||
-            branch.address.toLowerCase().includes(searchLower) ||
-            branch.phone.includes(searchTerm) ||
-            branch.email.toLowerCase().includes(searchLower) ||
-            branch.manager.toLowerCase().includes(searchLower)
-        );
+    const filteredBranches = branches.filter(branch => {
+        const matchesSearch = !searchTerm || 
+            branch.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            branch.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            branch.phone?.includes(searchTerm) ||
+            branch.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            branch.manager?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        return matchesSearch;
     });
 
-    const sortedBranches = [...filteredBranches].sort((a, b) => {
-        let aValue = a[sortField];
-        let bValue = b[sortField];
-
-        if (typeof aValue === 'string') {
-            aValue = aValue.toLowerCase();
-            bValue = bValue.toLowerCase();
-        }
-
-        if (sortDirection === 'asc') {
-            return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-        } else {
-            return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-        }
+    const sortedBranches = filteredBranches.sort((a, b) => {
+        return a.name?.localeCompare(b.name) || 0;
     });
 
     if (loading) {
         return (
-            <div className="table-loading">
-                <LoadingAtom size="medium" />
-                <span>Loading branches...</span>
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading branches...</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="page-content">
-            <div className="page-header">
-                <h1>Branches</h1>
-                <button
-                    className="btn btn-primary"
-                    onClick={handleNewBranch}
-                >
-                    <FaPlus /> Add Branch
-                </button>
-            </div>
-
-            <div className="table-controls">
-                <div className="search-bar">
-                    <FaSearch />
-                    <input
-                        type="text"
-                        placeholder="Search branches..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
+            <div className="max-w-7xl mx-auto p-6 flex-1 w-full">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Branch Management</h1>
+                        <p className="text-gray-600 dark:text-gray-400">Manage your martial arts school branches and locations</p>
+                    </div>
+                    <button
+                        className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center space-x-2 shadow-md hover:shadow-lg"
+                        onClick={handleNewBranch}
+                    >
+                        <FaPlus className="h-4 w-4" />
+                        <span>Add Branch</span>
+                    </button>
                 </div>
-            </div>
 
-            <div className="data-table-container">
-                <div className="table-responsive">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th
-                                    className="sortable"
-                                    onClick={() => handleSort('name')}
+                {/* Modern Controls */}
+                <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+                    <div className="flex flex-col lg:flex-row gap-4">
+                        <div className="flex-1 relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <FaSearch className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search branches by name, address, or contact..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700 placeholder-gray-400"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Branches List */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                    {sortedBranches.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16">
+                            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                                <FaMapMarkerAlt className="text-4xl text-gray-400" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Branches Found</h3>
+                            <p className="text-gray-600 text-center max-w-md">
+                                {searchTerm 
+                                    ? 'No branches match your current search criteria. Try adjusting your search.'
+                                    : 'Get started by adding your first branch to the system.'
+                                }
+                            </p>
+                            {!searchTerm && (
+                                <button
+                                    onClick={handleNewBranch}
+                                    className="mt-6 bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center space-x-2"
                                 >
-                                    Name {getSortIcon('name')}
-                                </th>
-                                <th>Address</th>
-                                <th>Phone</th>
-                                <th>Email</th>
-                                <th>Manager</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sortedBranches.length === 0 ? (
-                                <tr>
-                                    <td colSpan="6" className="empty-state">
-                                        <div className="empty-state-icon">
-                                            <FaMapMarkerAlt />
-                                        </div>
-                                        <h3>No branches found</h3>
-                                        <p>Try adjusting your search or add a new branch.</p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                sortedBranches.map((branch) => (
-                                    <tr key={branch.id} className="table-row">
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <div
-                                                    style={{
-                                                        width: '32px',
-                                                        height: '32px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#10b981',
-                                                        color: 'white',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        fontSize: '0.875rem',
-                                                        fontWeight: '600'
-                                                    }}
-                                                >
-                                                    <FaMapMarkerAlt />
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
-                                                        {branch.name}
+                                    <FaPlus className="h-5 w-5" />
+                                    <span>Add First Branch</span>
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            {/* Table Header */}
+                            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                                <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                                    <div className="col-span-3">Name</div>
+                                    <div className="col-span-3">Address</div>
+                                    <div className="col-span-2">Phone</div>
+                                    <div className="col-span-2">Manager</div>
+                                    <div className="col-span-1">Status</div>
+                                    <div className="col-span-1">Actions</div>
+                                </div>
+                            </div>
+
+                            {/* Table Body */}
+                            <div className="divide-y divide-gray-200">
+                                {sortedBranches.map((branch) => (
+                                    <div key={branch.id} className="px-6 py-4 hover:bg-gray-50 transition-colors duration-200">
+                                        <div className="grid grid-cols-12 gap-4 items-center">
+                                            {/* Name */}
+                                            <div className="col-span-3">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white">
+                                                        <FaMapMarkerAlt className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">{branch.name}</p>
+                                                        <p className="text-sm text-gray-600">ID: {branch.id}</p>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <FaMapMarkerAlt style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }} />
-                                                <span style={{ fontSize: '0.875rem' }}>{branch.address}</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <FaPhone style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }} />
-                                                {branch.phone || 'N/A'}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <FaEnvelope style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }} />
-                                                {branch.email || 'N/A'}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <FaUser style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }} />
-                                                {branch.manager || 'N/A'}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div className="action-buttons">
-                                                <button
-                                                    className="action-btn view"
-                                                    onClick={() => handleView(branch)}
-                                                    title="View Details"
-                                                >
-                                                    <FaEye />
-                                                </button>
-                                                <button
-                                                    className="action-btn edit"
-                                                    onClick={() => handleEdit(branch)}
-                                                    title="Edit Branch"
-                                                >
-                                                    <FaEdit />
-                                                </button>
-                                                <button
-                                                    className="action-btn delete"
-                                                    onClick={() => handleDelete(branch)}
-                                                    title="Delete Branch"
-                                                >
-                                                    <FaTrash />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
 
-                {/* Mobile Card View */}
-                <div className="mobile-card-view">
-                    {sortedBranches.length === 0 ? (
-                        <div className="empty-state">
-                            <div className="empty-state-icon">
-                                <FaMapMarkerAlt />
+                                            {/* Address */}
+                                            <div className="col-span-3">
+                                                <div className="flex items-start space-x-2">
+                                                    <FaMapMarkerAlt className="h-4 w-4 text-gray-400 mt-1" />
+                                                    <span className="text-sm text-gray-900">{branch.address || 'Not provided'}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Phone */}
+                                            <div className="col-span-2">
+                                                <div className="flex items-center space-x-2">
+                                                    <FaPhone className="h-4 w-4 text-gray-400" />
+                                                    <span className="text-sm text-gray-900">{branch.phone || 'Not provided'}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Manager */}
+                                            <div className="col-span-2">
+                                                <div className="flex items-center space-x-2">
+                                                    <FaUser className="h-4 w-4 text-gray-400" />
+                                                    <span className="text-sm text-gray-900">{branch.manager || 'Not assigned'}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Status */}
+                                            <div className="col-span-1">
+                                                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                                                    Active
+                                                </span>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="col-span-1">
+                                                <div className="flex items-center space-x-2">
+                                                    <button
+                                                        onClick={() => handleViewBranch(branch)}
+                                                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                                                        title="View Details"
+                                                    >
+                                                        <FaEye className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleEditBranch(branch)}
+                                                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200"
+                                                        title="Edit Branch"
+                                                    >
+                                                        <FaEdit className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteBranch(branch.id)}
+                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                                        title="Delete Branch"
+                                                    >
+                                                        <FaTrash className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                            <h3>No branches found</h3>
-                            <p>Try adjusting your search or add a new branch.</p>
-                        </div>
-                    ) : (
-                        sortedBranches.map((branch) => (
-                            <div key={branch.id} className="mobile-card">
-                                <div className="mobile-card-header">
-                                    <div
-                                        className="mobile-card-avatar"
-                                        style={{
-                                            backgroundColor: '#10b981'
-                                        }}
-                                    >
-                                        <FaMapMarkerAlt />
-                                    </div>
-                                    <div>
-                                        <h3 className="mobile-card-title">
-                                            {branch.name}
-                                        </h3>
-                                    </div>
-                                </div>
-
-                                <div className="mobile-card-details">
-                                    <div className="mobile-card-detail">
-                                        <span className="mobile-card-detail-label">Address</span>
-                                        <span className="mobile-card-detail-value">
-                                            {branch.address}
-                                        </span>
-                                    </div>
-                                    <div className="mobile-card-detail">
-                                        <span className="mobile-card-detail-label">Phone</span>
-                                        <span className="mobile-card-detail-value">
-                                            {branch.phone || 'N/A'}
-                                        </span>
-                                    </div>
-                                    <div className="mobile-card-detail">
-                                        <span className="mobile-card-detail-label">Email</span>
-                                        <span className="mobile-card-detail-value">
-                                            {branch.email || 'N/A'}
-                                        </span>
-                                    </div>
-                                    <div className="mobile-card-detail">
-                                        <span className="mobile-card-detail-label">Manager</span>
-                                        <span className="mobile-card-detail-value">
-                                            {branch.manager || 'N/A'}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="mobile-card-actions">
-                                    <button
-                                        className="action-btn view"
-                                        onClick={() => handleView(branch)}
-                                        title="View Details"
-                                    >
-                                        <FaEye /> View
-                                    </button>
-                                    <button
-                                        className="action-btn edit"
-                                        onClick={() => handleEdit(branch)}
-                                        title="Edit Branch"
-                                    >
-                                        <FaEdit /> Edit
-                                    </button>
-                                    <button
-                                        className="action-btn delete"
-                                        onClick={() => handleDelete(branch)}
-                                        title="Delete Branch"
-                                    >
-                                        <FaTrash /> Delete
-                                    </button>
-                                </div>
-                            </div>
-                        ))
+                        </>
                     )}
                 </div>
+
+                {/* Add/Edit Branch Modal */}
+                <Modal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    title={editingBranch ? 'Edit Branch' : 'Add New Branch'}
+                    size="large"
+                >
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                                    <span>Branch Name</span>
+                                    <span className="text-red-500 ml-1">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    required
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Manager</label>
+                                <input
+                                    type="text"
+                                    name="manager"
+                                    value={formData.manager}
+                                    onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                                <span>Address</span>
+                                <span className="text-red-500 ml-1">*</span>
+                            </label>
+                            <textarea
+                                name="address"
+                                value={formData.address}
+                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                required
+                                rows={3}
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
+                                <input
+                                    type="tel"
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-700"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end space-x-4">
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="px-6 py-3 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all duration-200 font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 font-medium"
+                            >
+                                {editingBranch ? 'Update Branch' : 'Add Branch'}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* View Branch Modal */}
+                <Modal
+                    isOpen={isViewModalOpen}
+                    onClose={() => setIsViewModalOpen(false)}
+                    title="Branch Details"
+                    size="large"
+                >
+                    {viewingBranch && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Branch Name</label>
+                                    <p className="text-lg text-gray-900">{viewingBranch.name}</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Manager</label>
+                                    <p className="text-lg text-gray-900">{viewingBranch.manager || 'Not assigned'}</p>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Address</label>
+                                <p className="text-lg text-gray-900">{viewingBranch.address}</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
+                                    <p className="text-lg text-gray-900">{viewingBranch.phone || 'Not provided'}</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                                    <p className="text-lg text-gray-900">{viewingBranch.email || 'Not provided'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </Modal>
+
+                {/* Delete Confirmation Dialog */}
+                <ConfirmDialog
+                    isOpen={isDeleteDialogOpen}
+                    onClose={() => setIsDeleteDialogOpen(false)}
+                    onConfirm={handleDelete}
+                    title="Delete Branch"
+                    message="Are you sure you want to delete this branch? This action cannot be undone."
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    type="danger"
+                />
             </div>
-
-            {/* Add/Edit Modal */}
-            <Modal
-                isOpen={showModal}
-                onClose={() => {
-                    setShowModal(false);
-                    setEditingBranch(null);
-                    resetForm();
-                }}
-                title={editingBranch ? 'Edit Branch' : 'Add New Branch'}
-                size="medium"
-            >
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label htmlFor="name">Branch Name *</label>
-                        <input
-                            type="text"
-                            id="name"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleInputChange}
-                            required
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="address">Address *</label>
-                        <textarea
-                            id="address"
-                            name="address"
-                            value={formData.address}
-                            onChange={handleInputChange}
-                            rows="3"
-                            required
-                        />
-                    </div>
-
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label htmlFor="phone">Phone</label>
-                            <input
-                                type="tel"
-                                id="phone"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="email">Email</label>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="manager_id">Manager</label>
-                        <select
-                            id="manager_id"
-                            name="manager_id"
-                            value={formData.manager_id}
-                            onChange={handleInputChange}
-                        >
-                            <option value="">Select Manager</option>
-                            {instructors.map(instructor => (
-                                <option key={instructor.id} value={instructor.id}>
-                                    {instructor.first_name} {instructor.last_name} - {instructor.branch_name}
-                                </option>
-                            ))}
-                        </select>
-                        <small className="form-help">
-                            Select an instructor to manage this branch
-                        </small>
-                    </div>
-
-                    <div className="modal-footer">
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => {
-                                setShowModal(false);
-                                setEditingBranch(null);
-                                resetForm();
-                            }}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="btn btn-primary"
-                            disabled={isSubmitting}
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <div className="loading-spinner"></div>
-                                    Saving...
-                                </>
-                            ) : (
-                                editingBranch ? 'Update Branch' : 'Create Branch'
-                            )}
-                        </button>
-                    </div>
-                </form>
-            </Modal>
-
-            {/* View Modal */}
-            <Modal
-                isOpen={showViewModal}
-                onClose={() => setShowViewModal(false)}
-                title="Branch Details"
-                size="medium"
-            >
-                {viewingBranch && (
-                    <div>
-                        <div className="form-group">
-                            <label>Branch Name</label>
-                            <p>{viewingBranch.name}</p>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Address</label>
-                            <p>{viewingBranch.address}</p>
-                        </div>
-
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>Phone</label>
-                                <p>{viewingBranch.phone || 'N/A'}</p>
-                            </div>
-                            <div className="form-group">
-                                <label>Email</label>
-                                <p>{viewingBranch.email || 'N/A'}</p>
-                            </div>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Manager</label>
-                            <p>{viewingBranch.manager || 'N/A'}</p>
-                        </div>
-
-                        <div className="modal-footer">
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => setShowViewModal(false)}
-                            >
-                                Close
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={() => {
-                                    setShowViewModal(false);
-                                    handleEdit(viewingBranch);
-                                }}
-                            >
-                                Edit Branch
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
-
-            {/* Delete Confirmation */}
-            <ConfirmDialog
-                isOpen={showDeleteConfirm}
-                onClose={() => {
-                    setShowDeleteConfirm(false);
-                    setDeletingBranch(null);
-                }}
-                onConfirm={confirmDelete}
-                title="Delete Branch"
-                message={`Are you sure you want to delete ${deletingBranch?.name}? This action cannot be undone.`}
-                type="delete"
-                confirmText="Delete"
-                cancelText="Cancel"
-            />
         </div>
     );
 };

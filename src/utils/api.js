@@ -1,31 +1,37 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://gama-backend.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 class ApiClient {
     constructor() {
         this.baseURL = API_BASE_URL;
     }
 
-    getAuthHeaders() {
+    getAuthHeaders(isFormData = false) {
         const token = localStorage.getItem('token');
         return {
-            'Content-Type': 'application/json',
-            ...(token && { Authorization: `Bearer ${token}` })
+            ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+            ...(token && { Authorization: `Bearer ${token}` }),
         };
     }
 
     async request(endpoint, options = {}) {
         const url = `${this.baseURL}${endpoint}`;
-        console.log('API Request:', url); // Debug log
+        const isFormData = options.body instanceof FormData;
+
         const config = {
-            headers: this.getAuthHeaders(),
-            ...options
+            ...options,
+            headers: { ...this.getAuthHeaders(isFormData), ...(options.headers || {}) },
         };
 
         try {
             const response = await fetch(url, config);
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
+                let errorData = {};
+                try {
+                    errorData = await response.json();
+                } catch {
+                    errorData = { error: response.statusText };
+                }
                 const error = new Error(errorData.error || `HTTP error! status: ${response.status}`);
                 error.response = { data: errorData, status: response.status };
                 throw error;
@@ -38,309 +44,288 @@ class ApiClient {
         }
     }
 
-    // Auth endpoints
-    async login(credentials) {
-        return this.request('/auth/login', {
-            method: 'POST',
-            body: JSON.stringify(credentials)
-        });
+    // --- Auth ---
+    login(credentials) {
+        return this.request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) });
     }
 
-    async getProfile() {
+    getProfile() {
         return this.request('/auth/profile');
     }
 
-    async logout() {
+    updateUser(userData) {
+        return this.request('/auth/profile', { method: 'PUT', body: JSON.stringify(userData) });
+    }
+
+    logout() {
         return this.request('/auth/logout', { method: 'POST' });
     }
 
-    // Students endpoints
-    async getStudents(params = {}) {
+    // --- Students ---
+    getStudents(params = {}) {
         const queryString = new URLSearchParams(params).toString();
         return this.request(`/students${queryString ? `?${queryString}` : ''}`);
     }
 
-    async getStudent(id) {
+    getStudent(id) {
         return this.request(`/students/${id}`);
     }
 
-    async createStudent(studentData) {
-        return this.request('/students', {
-            method: 'POST',
-            body: JSON.stringify(studentData)
-        });
+    createStudent(studentData) {
+        // Detect if there's a file
+        const hasFile = studentData.photo instanceof File;
+        const body = hasFile ? this.toFormData(studentData) : JSON.stringify(studentData);
+        return this.request('/students', { method: 'POST', body });
     }
 
-    async updateStudent(id, studentData) {
-        return this.request(`/students/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(studentData)
-        });
+    updateStudent(id, studentData) {
+        const hasFile = studentData.photo instanceof File;
+        const body = hasFile ? this.toFormData(studentData) : JSON.stringify(studentData);
+        return this.request(`/students/${id}`, { method: 'PUT', body });
     }
 
-    async deleteStudent(id, permanent = false) {
+    deleteStudent(id, permanent = false) {
         const queryString = permanent ? '?permanent=true' : '';
         return this.request(`/students/${id}${queryString}`, { method: 'DELETE' });
     }
 
-    async getInactiveStudents() {
+    getInactiveStudents() {
         return this.request('/students/inactive');
     }
 
-    async restoreStudent(id) {
+    restoreStudent(id) {
         return this.request(`/students/${id}/restore`, { method: 'POST' });
     }
 
-    // Instructors endpoints
-    async getInstructors(params = {}) {
+    // --- Utility to convert object to FormData ---
+    toFormData(obj) {
+        const formData = new FormData();
+        Object.entries(obj).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                formData.append(key, value);
+            }
+        });
+        return formData;
+    }
+
+    // --- Instructors ---
+    getInstructors(params = {}) {
         const queryString = new URLSearchParams(params).toString();
         return this.request(`/instructors${queryString ? `?${queryString}` : ''}`);
     }
 
-    async getInstructor(id) {
+    getInstructor(id) {
         return this.request(`/instructors/${id}`);
     }
 
-    async createInstructor(instructorData) {
-        return this.request('/instructors', {
-            method: 'POST',
-            body: JSON.stringify(instructorData)
-        });
+    createInstructor(instructorData) {
+        return this.request('/instructors', { method: 'POST', body: JSON.stringify(instructorData) });
     }
 
-    async updateInstructor(id, instructorData) {
-        return this.request(`/instructors/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(instructorData)
-        });
+    updateInstructor(id, instructorData) {
+        return this.request(`/instructors/${id}`, { method: 'PUT', body: JSON.stringify(instructorData) });
     }
 
-    async deleteInstructor(id, permanent = false) {
+    updateOwnProfile(profileData) {
+        return this.request('/instructor/profile', { method: 'PUT', body: JSON.stringify(profileData) });
+    }
+
+    deleteInstructor(id, permanent = false) {
         const queryString = permanent ? '?permanent=true' : '';
         return this.request(`/instructors/${id}${queryString}`, { method: 'DELETE' });
     }
 
-    async getInactiveInstructors() {
+    getInactiveInstructors() {
         return this.request('/instructors/inactive');
     }
 
-    async restoreInstructor(id) {
+    restoreInstructor(id) {
         return this.request(`/instructors/${id}/restore`, { method: 'POST' });
     }
 
-    // Attendance endpoints
-    async getAttendance(params = {}) {
+    // --- Attendance ---
+    getAttendance(params = {}) {
         const queryString = new URLSearchParams(params).toString();
         return this.request(`/attendance${queryString ? `?${queryString}` : ''}`);
     }
 
-    async getAttendanceById(id) {
+    getAttendanceById(id) {
         return this.request(`/attendance/${id}`);
     }
 
-    async createAttendance(attendanceData) {
-        return this.request('/attendance', {
-            method: 'POST',
-            body: JSON.stringify(attendanceData)
-        });
+    createAttendance(attendanceData) {
+        return this.request('/attendance', { method: 'POST', body: JSON.stringify(attendanceData) });
     }
 
-    async updateAttendance(id, attendanceData) {
-        return this.request(`/attendance/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(attendanceData)
-        });
+    updateAttendance(id, attendanceData) {
+        return this.request(`/attendance/${id}`, { method: 'PUT', body: JSON.stringify(attendanceData) });
     }
 
-    async deleteAttendance(id) {
+    deleteAttendance(id) {
         return this.request(`/attendance/${id}`, { method: 'DELETE' });
     }
 
-    async createAttendanceApproval(approvalData) {
-        return this.request('/attendance/approval', {
-            method: 'POST',
-            body: JSON.stringify(approvalData)
-        });
+    createAttendanceApproval(approvalData) {
+        return this.request('/attendance/approval', { method: 'POST', body: JSON.stringify(approvalData) });
     }
 
-    async getAttendanceApprovals() {
+    getAttendanceApprovals() {
         return this.request('/attendance/approvals');
     }
 
-    async updateAttendanceApproval(id, status) {
-        return this.request(`/attendance/approval/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ status })
-        });
+    updateAttendanceApproval(id, status) {
+        return this.request(`/attendance/approval/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
     }
 
-    // Products endpoints
-    async getProducts() {
+    // --- Products ---
+    getProducts() {
         return this.request('/products');
     }
 
-    async getProduct(id) {
+    getProduct(id) {
         return this.request(`/products/${id}`);
     }
 
-    async getProductsByCategory(category) {
+    getProductsByCategory(category) {
         return this.request(`/products/category/${category}`);
     }
 
-    async getProductCategories() {
+    getProductCategories() {
         return this.request('/products/categories/list');
     }
 
-    // Orders endpoints
-    async createOrder(orderData) {
-        return this.request('/orders', {
-            method: 'POST',
-            body: JSON.stringify(orderData)
-        });
+    // --- Orders ---
+    createOrder(orderData) {
+        return this.request('/orders', { method: 'POST', body: JSON.stringify(orderData) });
     }
 
-    async getMyOrders() {
+    getMyOrders() {
         return this.request('/orders/my-orders');
     }
 
-    async getOrder(id) {
+    getOrder(id) {
         return this.request(`/orders/${id}`);
     }
 
-    async getAllOrders() {
+    getAllOrders() {
         return this.request('/orders');
     }
 
-    async getOrders() {
-        return this.request('/orders');
+    updateOrderStatus(id, statusData) {
+        return this.request(`/orders/${id}/status`, { method: 'PUT', body: JSON.stringify(statusData) });
     }
 
-    async updateOrderStatus(id, statusData) {
-        return this.request(`/orders/${id}/status`, {
-            method: 'PUT',
-            body: JSON.stringify(statusData)
-        });
-    }
-
-    async getOrderStats() {
+    getOrderStats() {
         return this.request('/orders/stats/overview');
     }
 
-    // Fees endpoints
-    async getFees(params = {}) {
+    // --- Fees ---
+    getFees(params = {}) {
         const queryString = new URLSearchParams(params).toString();
         return this.request(`/fees${queryString ? `?${queryString}` : ''}`);
     }
 
-    async getFeeById(id) {
+    getFeeById(id) {
         return this.request(`/fees/${id}`);
     }
 
-    async createFee(feeData) {
-        return this.request('/fees', {
-            method: 'POST',
-            body: JSON.stringify(feeData)
-        });
+    createFee(feeData) {
+        return this.request('/fees', { method: 'POST', body: JSON.stringify(feeData) });
     }
 
-    async updateFee(id, feeData) {
-        return this.request(`/fees/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(feeData)
-        });
+    updateFee(id, feeData) {
+        return this.request(`/fees/${id}`, { method: 'PUT', body: JSON.stringify(feeData) });
     }
 
-    async deleteFee(id) {
+    deleteFee(id) {
         return this.request(`/fees/${id}`, { method: 'DELETE' });
     }
 
-    // Dashboard endpoints
-    async getDashboardStats() {
+    // --- Dashboard ---
+    getDashboardStats() {
         return this.request('/dashboard/stats');
     }
 
-    // Branches endpoints
-    async getBranches(params = {}) {
+    // --- Branches / Schools ---
+    getBranches(params = {}) {
         const queryString = new URLSearchParams(params).toString();
         return this.request(`/branches${queryString ? `?${queryString}` : ''}`);
     }
 
-    async getBranch(id) {
+    getBranch(id) {
         return this.request(`/branches/${id}`);
     }
 
-    async createBranch(branchData) {
-        return this.request('/branches', {
-            method: 'POST',
-            body: JSON.stringify(branchData)
-        });
+    createBranch(branchData) {
+        return this.request('/branches', { method: 'POST', body: JSON.stringify(branchData) });
     }
 
-    async updateBranch(id, branchData) {
-        return this.request(`/branches/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(branchData)
-        });
+    updateBranch(id, branchData) {
+        return this.request(`/branches/${id}`, { method: 'PUT', body: JSON.stringify(branchData) });
     }
 
-    async deleteBranch(id) {
+    deleteBranch(id) {
         return this.request(`/branches/${id}`, { method: 'DELETE' });
     }
 
-    // Schools endpoints (using branches table for now)
-    async getSchools(params = {}) {
-        const queryString = new URLSearchParams(params).toString();
-        return this.request(`/branches${queryString ? `?${queryString}` : ''}`);
-    }
-
-    async getSchool(id) {
-        return this.request(`/branches/${id}`);
-    }
-
-    async createSchool(schoolData) {
-        return this.request('/branches', {
-            method: 'POST',
-            body: JSON.stringify(schoolData)
-        });
-    }
-
-    async updateSchool(id, schoolData) {
-        return this.request(`/branches/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(schoolData)
-        });
-    }
-
-    async deleteSchool(id) {
-        return this.request(`/branches/${id}`, { method: 'DELETE' });
-    }
-
-    // Inventory endpoints
-    async getInventory(params = {}) {
+    // Inventory
+    getInventory(params = {}) {
         const queryString = new URLSearchParams(params).toString();
         return this.request(`/inventory${queryString ? `?${queryString}` : ''}`);
     }
 
-    async getInventoryById(id) {
+    getInventoryById(id) {
         return this.request(`/inventory/${id}`);
     }
 
-    async createInventoryItem(itemData) {
-        return this.request('/inventory', {
-            method: 'POST',
-            body: JSON.stringify(itemData)
-        });
+    createInventoryItem(itemData) {
+        return this.request('/inventory', { method: 'POST', body: JSON.stringify(itemData) });
     }
 
-    async updateInventoryItem(id, itemData) {
-        return this.request(`/inventory/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(itemData)
-        });
+    updateInventoryItem(id, itemData) {
+        return this.request(`/inventory/${id}`, { method: 'PUT', body: JSON.stringify(itemData) });
     }
 
-    async deleteInventoryItem(id) {
+    deleteInventoryItem(id) {
         return this.request(`/inventory/${id}`, { method: 'DELETE' });
+    }
+
+    // --- Announcements ---
+    getAnnouncements() {
+        return this.request('/announcements');
+    }
+
+    getAnnouncementById(id) {
+        return this.request(`/announcements/${id}`);
+    }
+
+    createAnnouncement(announcementData) {
+        return this.request('/announcements', { method: 'POST', body: JSON.stringify(announcementData) });
+    }
+
+    updateAnnouncement(id, announcementData) {
+        return this.request(`/announcements/${id}`, { method: 'PUT', body: JSON.stringify(announcementData) });
+    }
+
+    deleteAnnouncement(id) {
+        return this.request(`/announcements/${id}`, { method: 'DELETE' });
+    }
+
+    // --- Notifications ---
+    getNotifications() {
+        return this.request('/announcements/notifications/all');
+    }
+
+    getOrderNotifications() {
+        return this.request('/announcements/notifications/orders');
+    }
+
+    markNotificationAsRead(id) {
+        return this.request(`/announcements/notifications/${id}/read`, { method: 'PUT' });
+    }
+
+    markAllNotificationsAsRead() {
+        return this.request('/announcements/notifications/read-all', { method: 'PUT' });
     }
 }
 

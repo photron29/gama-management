@@ -1,27 +1,53 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+// Define the shape of the context data
+// We are now providing a boolean (isDarkMode) and a toggle function
 const ThemeContext = createContext();
 
+// Helper to determine initial theme
+const getInitialTheme = () => {
+    if (typeof window === 'undefined') {
+        return false; // Default to light mode (false) during server-side rendering
+    }
+    
+    // 1. Check saved preference in localStorage
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        return savedTheme === 'dark';
+    }
+    
+    // 2. Check system preference
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+};
+
 export const ThemeProvider = ({ children }) => {
-    const [isDarkMode, setIsDarkMode] = useState(() => {
-        // Check localStorage first, then system preference
-        const saved = localStorage.getItem('theme');
-        if (saved) {
-            return saved === 'dark';
-        }
-        return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    });
+    // Set initial state using the helper function
+    const [isDarkMode, setIsDarkMode] = useState(getInitialTheme);
 
     useEffect(() => {
-        // Save theme preference
-        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        // Determine the class name string
+        const theme = isDarkMode ? 'dark' : 'light';
+        
+        // 1. Save preference
+        localStorage.setItem('theme', theme);
 
-        // Update document class for CSS variables
-        document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
-    }, [isDarkMode]);
+        // 2. Update document class for Tailwind dark mode
+        const root = window.document.documentElement;
+        
+        // Ensure no redundant classes are present
+        root.classList.remove('dark', 'light');
+
+        if (isDarkMode) {
+            root.classList.add('dark');
+        } else {
+            // We don't need to explicitly add 'light' since Tailwind defaults to light
+            // but we can add it for clarity if needed, or just let it inherit the default styles.
+        }
+        
+    }, [isDarkMode]); // Re-run whenever the dark mode state changes
 
     const toggleTheme = () => {
-        setIsDarkMode(!isDarkMode);
+        setIsDarkMode(prevMode => !prevMode);
     };
 
     const value = {
@@ -36,6 +62,7 @@ export const ThemeProvider = ({ children }) => {
     );
 };
 
+// Custom hook to use the theme context
 export const useTheme = () => {
     const context = useContext(ThemeContext);
     if (!context) {

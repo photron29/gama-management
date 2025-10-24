@@ -6,7 +6,7 @@ const getFees = async (req, res) => {
         const { student_id, status, fee_type, branch_id } = req.query;
 
         let query = `
-      SELECT f.*, s.first_name, s.last_name, b.name as branch_name
+      SELECT f.*, s.name, b.name as branch_name
       FROM fees f
       JOIN students s ON f.student_id = s.id
       JOIN branches b ON s.branch_id = b.id
@@ -45,7 +45,7 @@ const getFees = async (req, res) => {
             params.push(branch_id);
         }
 
-        query += ` ORDER BY f.created_at DESC, s.last_name, s.first_name`;
+        query += ` ORDER BY f.created_at DESC, s.name`;
 
         const result = await pool.query(query, params);
         res.json({ fees: result.rows });
@@ -61,7 +61,7 @@ const getFeeById = async (req, res) => {
         const { id } = req.params;
 
         let query = `
-      SELECT f.*, s.first_name, s.last_name, b.name as branch_name
+      SELECT f.*, s.name, b.name as branch_name
       FROM fees f
       JOIN students s ON f.student_id = s.id
       JOIN branches b ON s.branch_id = b.id
